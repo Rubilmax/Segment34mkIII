@@ -1,12 +1,9 @@
-# Segment34 MkII - Frequently asked Questions
+# Segment34 MkIII - Frequently asked Questions
 
 ### How do I change the settings? Where are the settings?
-The settings is only available through the Garmin Connect IQ app. Go to [the page for the watch face](https://apps.garmin.com/apps/aa85d03d-ab89-4e06-b8c6-71a014198593) and look for the big blue Settings button. You can also find it if you go to Device -> My Watch Faces -> Segment34 MkII.
+The settings is only available through the Garmin Connect IQ app. Go to [the page for the watch face](https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b) and look for the big blue Settings button. You can also find it if you go to Device -> My Watch Faces -> Segment34 MkIII.
 
 The settings can not be changed on the watch itself.
-
-### Do I need to buy you a coffee to unlock features of the watch face?
-**No, everything is included for free**. Donating money / buying coffee through ko-fi does not unlock anything as there is nothing to unlock, everything is already included. You are however very welcome to support me anyway if you like the watch face: [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/M4M51A1RGV)
 
 ### How does the custom themes work?
 Custom themes are best created with the [Theme designer](https://ludw.github.io). When it looks they way you want just copy the string of color codes at the bottom and enter them into the "Custom colors" field in settings for the watchface. Make sure to also select "Custom colors" as the theme.
