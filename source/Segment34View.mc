@@ -2675,7 +2675,7 @@ class Segment34View extends WatchUi.WatchFace {
             if(ret.length() == 0) {
                 ret = array[i];
             } else {
-                ret = ret + ", " + array[i];
+                ret = ret + "  " + array[i];
             }
         }
         return ret;

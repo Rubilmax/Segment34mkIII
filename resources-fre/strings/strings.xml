@@ -116,7 +116,7 @@
     <string id="LABEL_CAL_3">CAL. JOUR</string>
     <string id="LABEL_ALT_1">ALT</string>
     <string id="LABEL_ALT_2">ALTITUDE</string>
-    <string id="LABEL_ALTM_3">ALTITUDE M</string>
+    <string id="LABEL_ALTM_3">ALT (M)</string>
     <string id="LABEL_STRESS">STRESS:</string>
     <string id="LABEL_ALTFT_3">ALTITUDE PI</string>
     <string id="LABEL_BBAT_1">BATT C</string>
