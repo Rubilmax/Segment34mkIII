@@ -1,7 +1,7 @@
-# Segment34 MkIII - Frequently asked Questions
+# Segment34Plus - Frequently asked Questions
 
 ### How do I change the settings? Where are the settings?
-The settings is only available through the Garmin Connect IQ app. Go to [the page for the watch face](https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b) and look for the big blue Settings button. You can also find it if you go to Device -> My Watch Faces -> Segment34 MkIII.
+The settings is only available through the Garmin Connect IQ app. Go to [the page for the watch face](https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b) and look for the big blue Settings button. You can also find it if you go to Device -> My Watch Faces -> Segment34Plus.
 
 The settings can not be changed on the watch itself.
 

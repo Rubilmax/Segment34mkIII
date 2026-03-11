@@ -6,7 +6,7 @@
     <property id="hourFormat" type="number">0</property>
     <property id="zeropadHour" type="boolean">true</property>
     <property id="timeSeparator" type="number">0</property>
-    <property id="tempUnit" type="number">0</property>
+    <property id="tempUnit" type="number">3</property>
     <property id="showTempUnit" type="boolean">true</property>
     <property id="windUnit" type="number">0</property>
     <property id="pressureUnit" type="number">0</property>
@@ -22,8 +22,8 @@
     <property id="alwaysShowSeconds" type="boolean">false</property>
     <property id="updateFreq" type="number">5</property>
     <property id="batteryVariant" type="number">3</property>
-    <property id="weatherLine1Shows" type="number">49</property>
-    <property id="weatherLine2Shows" type="number">50</property>
+    <property id="weatherLine1Shows" type="number">77</property>
+    <property id="weatherLine2Shows" type="number">73</property>
     <property id="fieldLayout" type="number">0</property>
     <property id="leftValueShows" type="number">6</property>
     <property id="middleValueShows" type="number">10</property>

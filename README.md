@@ -1,4 +1,4 @@
-# Segment34 MkIII
+# Segment34Plus
 A watchface for Garmin watches with a 34 Segment display, forked from [Segment34 MkII](https://github.com/ludw/Segment34mkII) after [PR #76](https://github.com/ludw/Segment34mkII/pull/76) was rejected.
 
 ![Screenshot of the watchface](screenshot.png "Screenshot")
@@ -20,7 +20,7 @@ The watchface features the following:
 
 
 ## Frequently Asked Questions
-https://github.com/Rubilmax/Segment34mkIII/blob/main/FAQ.md
+https://github.com/Rubilmax/Segment34Plus/blob/main/FAQ.md
 
 ## IQ Store Listing
 https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b
