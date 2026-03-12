@@ -48,20 +48,4 @@ https://github.com/Rubilmax/Segment34Plus/blob/main/FAQ.md
 
 ## IQ Store Listing
 
-https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b
-
-## Contributing
-
-- For larger changes, **please open an issue first** and discuss what you have in mind.
-- Keep PRs small, don't do a lot of different changes at once.
-- Explain what you have changed and why.
-- Only submit code you have actually run and tested (on all supported screen sizes).
-- Remember that watch faces have to be performant and memory efficient.
-  Changes that significantly increase memory use or degrade performance will be rejected.
-- For optimizations, please provide memory and profiler comparisons.
-- Try to keep the code in the same style as the rest of the project:
-  - Indent with four spaces.
-  - Local variables with snake_case.
-  - Function and global variable names with camelCase.
-  - Cache all properties.
-  - Use comments only when they add value.
+https://apps.garmin.com/apps/e8964cd6-53da-4004-aa03-1566c5d577e4

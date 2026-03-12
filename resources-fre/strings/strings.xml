@@ -214,6 +214,7 @@
     <string id="settings_orange" scope="settings">Orange</string>
     <string id="settings_amber" scope="settings">Ambre</string>
     <string id="settings_peachy_orange" scope="settings">Orange pêche</string>
+    <string id="settings_peachy_orange_on_turquoise" scope="settings">Orange pêche sur turquoise</string>
     <string id="settings_red" scope="settings">Rouge</string>
     <string id="settings_purple" scope="settings">Violet</string>
     <string id="settings_white_on_turquoise" scope="settings">Blanc sur turquoise</string>

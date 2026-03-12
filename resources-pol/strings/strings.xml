@@ -214,6 +214,7 @@
     <string id="settings_orange" scope="settings">Pomarańczowy</string>
     <string id="settings_amber" scope="settings">Bursztynowy</string>
     <string id="settings_peachy_orange" scope="settings">Brzoskwiniowy pomarańczowy</string>
+    <string id="settings_peachy_orange_on_turquoise" scope="settings">Brzoskwiniowy na turkusowym</string>
     <string id="settings_red" scope="settings">Czerwony</string>
     <string id="settings_purple" scope="settings">Fioletowy</string>
     <string id="settings_white_on_turquoise" scope="settings">Biały na turkusowym</string>

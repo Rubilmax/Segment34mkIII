@@ -12,6 +12,7 @@
             <listEntry value="18">@Strings.settings_green_and_orange</listEntry>
             <listEntry value="11">@Strings.settings_orange</listEntry>
             <listEntry value="23">@Strings.settings_amber</listEntry>
+            <listEntry value="24">@Strings.settings_peachy_orange_on_turquoise</listEntry>
             <listEntry value="5">@Strings.settings_peachy_orange</listEntry>
             <listEntry value="20">@Strings.settings_red</listEntry>
             <listEntry value="22">@Strings.settings_purple</listEntry>
@@ -33,6 +34,7 @@
     <setting propertyKey="@Properties.nightColorTheme" title="@Strings.settings_night_color_theme">
         <settingConfig type="list">
             <listEntry value="-1">@Strings.settings_no_change</listEntry>
+            <listEntry value="24">@Strings.settings_peachy_orange_on_turquoise</listEntry>
             <listEntry value="0">@Strings.settings_yellow_on_turquoise</listEntry>
             <listEntry value="8">@Strings.settings_yellow_on_blue</listEntry>
             <listEntry value="1">@Strings.settings_hot_pink</listEntry>
@@ -43,6 +45,7 @@
             <listEntry value="18">@Strings.settings_green_and_orange</listEntry>
             <listEntry value="11">@Strings.settings_orange</listEntry>
             <listEntry value="23">@Strings.settings_amber</listEntry>
+            <listEntry value="24">@Strings.settings_peachy_orange_on_turquoise</listEntry>
             <listEntry value="5">@Strings.settings_peachy_orange</listEntry>
             <listEntry value="20">@Strings.settings_red</listEntry>
             <listEntry value="22">@Strings.settings_purple</listEntry>
