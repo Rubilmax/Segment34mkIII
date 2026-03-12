@@ -52,8 +52,6 @@ https://apps.garmin.com/apps/38417f58-d9a2-4d76-a10d-ad2263acdf6b
 
 ## Contributing
 
-Pull requests are welcome, but please follow these guidelines:
-
 - For larger changes, **please open an issue first** and discuss what you have in mind.
 - Keep PRs small, don't do a lot of different changes at once.
 - Explain what you have changed and why.

@@ -1,6 +1,8 @@
 <fonts>
     <font id="segments145" filename="segments145.fnt" antialias="false" filter=" #1234567890:" />
     <font id="segments145outline" filename="segments145outline.fnt" antialias="true" filter=" #1234567890:" />
+    <font id="segments145_2" filename="segments145_2.fnt" antialias="true" filter=" #1234567890:" />
+    <font id="segments145outline_2" filename="segments145outline_2.fnt" antialias="true" filter=" #1234567890:" />
     <font id="led_small_lines" filename="led_small_lines.fnt" antialias="false" />
     <font id="led" filename="led.fnt" antialias="false" />
     <font id="led_inbetween" filename="led_inbetween.fnt" antialias="true" />
