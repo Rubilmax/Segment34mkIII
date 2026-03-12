@@ -6,11 +6,11 @@
     <property id="hourFormat" type="number">0</property>
     <property id="zeropadHour" type="boolean">true</property>
     <property id="timeSeparator" type="number">0</property>
-    <property id="tempUnit" type="number">3</property>
+    <property id="tempUnit" type="number">0</property>
     <property id="showTempUnit" type="boolean">true</property>
     <property id="windUnit" type="number">0</property>
     <property id="pressureUnit" type="number">0</property>
-    <property id="notificationCountShows" type="number">36</property>
+    <property id="notificationCountShows" type="number">14</property>
     <property id="showSeconds" type="boolean">true</property>
     <property id="topPartShows" type="number">0</property>
     <property id="sunriseFieldShows" type="number">39</property>
@@ -20,18 +20,18 @@
     <property id="showClockBg" type="boolean">true</property>
     <property id="showDataBg" type="boolean">true</property>
     <property id="alwaysShowSeconds" type="boolean">false</property>
-    <property id="updateFreq" type="number">5</property>
-    <property id="batteryVariant" type="number">3</property>
+    <property id="updateFreq" type="number">30</property>
+    <property id="batteryVariant" type="number">1</property>
     <property id="weatherLine1Shows" type="number">77</property>
     <property id="weatherLine2Shows" type="number">73</property>
-    <property id="fieldLayout" type="number">0</property>
-    <property id="leftValueShows" type="number">6</property>
-    <property id="middleValueShows" type="number">10</property>
-    <property id="rightValueShows" type="number">0</property>
-    <property id="fourthValueShows" type="number">-2</property>
+    <property id="fieldLayout" type="number">11</property>
+    <property id="leftValueShows" type="number">11</property>
+    <property id="middleValueShows" type="number">29</property>
+    <property id="rightValueShows" type="number">6</property>
+    <property id="fourthValueShows" type="number">10</property>
     <property id="bottomFieldShows" type="number">17</property>
     <property id="bottomField2Shows" type="number">-2</property>
-    <property id="aodStyle" type="number">1</property>
+    <property id="aodStyle" type="number">0</property>
     <property id="aodFieldShows" type="number">-1</property>
     <property id="aodRightFieldShows" type="number">-2</property>
     <property id="dateFieldShows" type="number">-1</property>
@@ -51,11 +51,11 @@
     <property id="icon1" type="number">1</property>
     <property id="icon2" type="number">2</property>
     <property id="weekOffset" type="number">0</property>
-    <property id="pressToOpenTop" type="number">0</property>
-    <property id="pressToOpenMiddle" type="number">0</property>
-    <property id="pressToOpenBottomLeft" type="number">0</property>
-    <property id="pressToOpenBottomCenter" type="number">0</property>
-    <property id="pressToOpenBottomRight" type="number">0</property>
+    <property id="pressToOpenTop" type="number">8</property>
+    <property id="pressToOpenMiddle" type="number">12</property>
+    <property id="pressToOpenBottomLeft" type="number">3</property>
+    <property id="pressToOpenBottomCenter" type="number">1</property>
+    <property id="pressToOpenBottomRight" type="number">23</property>
     <property id="labelVisibility" type="number">0</property>
-    <property id="stressDynamicColor" type="boolean">false</property>
+    <property id="stressDynamicColor" type="boolean">true</property>
 </properties>
