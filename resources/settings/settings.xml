@@ -363,6 +363,8 @@
         <settingConfig type="list">
             <listEntry value="-2">@Strings.settings_hidden</listEntry>
             <listEntry value="36">@Strings.settings_notification_count</listEntry>
+            <listEntry value="14">@Strings.settings_body_battery</listEntry>
+            <listEntry value="13">@Strings.settings_stress_score</listEntry>
             <listEntry value="31">@Strings.settings_week_number</listEntry>
             <listEntry value="34">@Strings.settings_battery_percentage</listEntry>
             <listEntry value="35">@Strings.settings_battery_days_remaining</listEntry>

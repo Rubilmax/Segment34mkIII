@@ -1405,23 +1405,23 @@ class Segment34View extends WatchUi.WatchFace {
         propDateFieldShows = getValueOrDefault("dateFieldShows", -1) as Number;
         propShowSeconds = getValueOrDefault("showSeconds", true) as Boolean;
         propAlwaysShowSeconds = getValueOrDefault("alwaysShowSeconds", false) as Boolean;
-        propFieldLayout = getValueOrDefault("fieldLayout", 0) as Number;
-        propLeftValueShows = getValueOrDefault("leftValueShows", 6) as Number;
-        propMiddleValueShows = getValueOrDefault("middleValueShows", 10) as Number;
-        propRightValueShows = getValueOrDefault("rightValueShows", 0) as Number;
-        propFourthValueShows = getValueOrDefault("fourthValueShows", -2) as Number;
+        propFieldLayout = getValueOrDefault("fieldLayout", 11) as Number;
+        propLeftValueShows = getValueOrDefault("leftValueShows", 11) as Number;
+        propMiddleValueShows = getValueOrDefault("middleValueShows", 29) as Number;
+        propRightValueShows = getValueOrDefault("rightValueShows", 6) as Number;
+        propFourthValueShows = getValueOrDefault("fourthValueShows", 10) as Number;
         propBottomFieldShows = getValueOrDefault("bottomFieldShows", 17) as Number;
         loadBottomField2Property();
         propLeftBarShows = getValueOrDefault("leftBarShows", 1) as Number;
         propRightBarShows = getValueOrDefault("rightBarShows", 2) as Number;
         propIcon1 = getValueOrDefault("icon1", 1) as Number;
         propIcon2 = getValueOrDefault("icon2", 2) as Number;
-        propBatteryVariant = getValueOrDefault("batteryVariant", 3) as Number;
+        propBatteryVariant = getValueOrDefault("batteryVariant", 1) as Number;
         
-        propUpdateFreq = getValueOrDefault("updateFreq", 5) as Number;
+        propUpdateFreq = getValueOrDefault("updateFreq", 30) as Number;
         propShowClockBg = getValueOrDefault("showClockBg", true) as Boolean;
         propShowDataBg = getValueOrDefault("showDataBg", true) as Boolean;
-        propAodStyle = getValueOrDefault("aodStyle", 1) as Number;
+        propAodStyle = getValueOrDefault("aodStyle", 0) as Number;
         propAodFieldShows = getValueOrDefault("aodFieldShows", -1) as Number;
         propAodRightFieldShows = getValueOrDefault("aodRightFieldShows", -2) as Number;
         propAodAlignment = getValueOrDefault("aodAlignment", 0) as Number;
@@ -1438,7 +1438,7 @@ class Segment34View extends WatchUi.WatchFace {
         propPressureUnit = getValueOrDefault("pressureUnit", 0) as Number;
         propLabelVisibility = getValueOrDefault("labelVisibility", 0) as Number;
         propDateFormat = getValueOrDefault("dateFormat", 0) as Number;
-        propNotificationCountShows = getValueOrDefault("notificationCountShows", 36) as Number;
+        propNotificationCountShows = getValueOrDefault("notificationCountShows", 14) as Number;
         propTzOffset1 = getValueOrDefault("tzOffset1", 0) as Number;
         propTzOffset2 = getValueOrDefault("tzOffset2", 0) as Number;
         propTzName1 = getValueOrDefault("tzName1", "UTC TIME") as String;
@@ -1446,7 +1446,7 @@ class Segment34View extends WatchUi.WatchFace {
         propWeekOffset = getValueOrDefault("weekOffset", 0) as Number;
         propSmallFontVariant = getValueOrDefault("smallFontVariant", 2) as Number;
         propIs24H = System.getDeviceSettings().is24Hour;
-        propStressDynamicColor = getValueOrDefault("stressDynamicColor", false) as Boolean;
+        propStressDynamicColor = getValueOrDefault("stressDynamicColor", true) as Boolean;
 
         nightMode = null; // force update color theme
         updateColorTheme();
@@ -2822,7 +2822,7 @@ class Segment34View extends WatchUi.WatchFace {
 
     hidden function formatTemperature(temp) as String {
         if(propShowTempUnit) {
-            if(propTempUnit == 3) {
+            if(propTempUnit == 3 or (propTempUnit == 0 and cachedTempUnit.equals("C"))) {
                 return temp.format("%d") + "\u00B0";
             }
             return temp.format("%d") + cachedTempUnit;
