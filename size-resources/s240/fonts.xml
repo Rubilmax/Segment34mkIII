@@ -1,0 +1,9 @@
+<fonts>
+    <font id="segments80narrow" filename="segments80narrow.fnt" antialias="true" filter=" #1234567890:" />
+    <font id="smol" filename="smol.fnt" antialias="false" />
+    <font id="led_small" filename="led_small.fnt" antialias="false" />
+    <font id="led_small_readable" filename="led_small_readable.fnt" antialias="true" />
+    <font id="led_small_lines" filename="led_small_lines.fnt" antialias="false" />
+    <font id="led" filename="led.fnt" antialias="false" />
+    <font id="xsmol" filename="xsmol.fnt" antialias="false" />
+</fonts>

@@ -1,0 +1,13 @@
+<fonts>
+    <font id="segments125narrow" filename="segments125narrow.fnt" antialias="false" filter=" #1234567890:" />
+    <font id="segments125narrowoutline" filename="segments125narrowoutline.fnt" antialias="false" filter=" #1234567890:" />
+    <font id="storre" filename="storre.fnt" antialias="false" />
+    <font id="led" filename="led.fnt" antialias="false" />
+    <font id="led_inbetween" filename="led_inbetween.fnt" antialias="true" />
+    <font id="led_lines" filename="led_lines.fnt" antialias="false" />
+    <font id="led_big" filename="led_big.fnt" antialias="false" />
+    <font id="led_big_readable" filename="led_big_readable.fnt" antialias="false"/>
+    <font id="led_big_lines" filename="led_big_lines.fnt" antialias="false"/>
+    <font id="smol" filename="smol.fnt" antialias="false" />
+    <font id="led_small_lines" filename="led_small_lines.fnt" antialias="false" />
+</fonts>
