@@ -31,9 +31,15 @@ const WEATHER_PROVIDER_STALE_AFTER_S = 28800;
 (:background)
 const WEATHER_PROVIDER_IMMEDIATE_GUARD_S = 300;
 (:background)
-const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 8;
+const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 32;
 (:background)
-const WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT = 0;
+const WEATHER_PROVIDER_DETAILED_HOURLY_FORECAST_LIMIT = 8;
+(:background)
+const WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT = 16;
+(:background)
+const WEATHER_PROVIDER_BACKGROUND_SECONDARY_FALLBACK_HOURLY_LIMIT = 8;
+(:background)
+const WEATHER_PROVIDER_BACKGROUND_EMPTY_HOURLY_LIMIT = 0;
 // The hourly window can spill into the next local calendar day late in the day.
 (:background)
 const WEATHER_PROVIDER_FORECAST_DAYS = 3;
@@ -337,8 +343,9 @@ function weatherProviderBuildOpenMeteoParams(location as Array?) as Dictionary {
         "timezone" => "auto",
         "timeformat" => "unixtime",
         "forecast_days" => WEATHER_PROVIDER_FORECAST_DAYS.format("%d"),
+        "forecast_hours" => WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT.format("%d"),
         "wind_speed_unit" => "ms",
-        "current" => "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m",
+        "current" => "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability,uv_index",
         "hourly" => "temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,uv_index",
         "daily" => "temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset"
     };
@@ -502,16 +509,24 @@ function weatherProviderBuildSnapshotFromOpenMeteoResponse(data as Dictionary, l
     var currentDayIdx = weatherProviderFindDailyIndexForTime(dailyTimes, currentTime, utcOffsetSeconds as Number);
     if (currentDayIdx < 0) { currentDayIdx = 0; }
 
-    var currentUv = (nearestHourlyIdx >= 0) ? weatherProviderGetHourlyFloat(hourly, "uv_index", nearestHourlyIdx) : null;
+    var currentUv = weatherProviderToFloat(current.get("uv_index"));
+    if (currentUv == null && nearestHourlyIdx >= 0) {
+        currentUv = weatherProviderGetHourlyFloat(hourly, "uv_index", nearestHourlyIdx);
+    }
     if (currentUv == null) {
         currentUv = weatherProviderToFloat(weatherProviderGetDailyNumber(daily, "uv_index_max", currentDayIdx));
+    }
+
+    var currentPrecipitationChance = weatherProviderToNumber(current.get("precipitation_probability"));
+    if (currentPrecipitationChance == null && nearestHourlyIdx >= 0) {
+        currentPrecipitationChance = weatherProviderGetHourlyNumber(hourly, "precipitation_probability", nearestHourlyIdx);
     }
 
     var currentSnapshot = {
         "condition" => weatherProviderWmoToGarminCondition(weatherProviderToNumber(current.get("weather_code"))),
         "temperature" => weatherProviderToNumber(current.get("temperature_2m")),
         "feelsLikeTemperature" => weatherProviderToFloat(current.get("apparent_temperature")),
-        "precipitationChance" => (nearestHourlyIdx >= 0) ? weatherProviderGetHourlyNumber(hourly, "precipitation_probability", nearestHourlyIdx) : null,
+        "precipitationChance" => currentPrecipitationChance,
         "relativeHumidity" => weatherProviderToNumber(current.get("relative_humidity_2m")),
         "windBearing" => weatherProviderToNumber(current.get("wind_direction_10m")),
         "windSpeed" => weatherProviderToFloat(current.get("wind_speed_10m")),
@@ -532,8 +547,6 @@ function weatherProviderBuildSnapshotFromOpenMeteoResponse(data as Dictionary, l
         var forecastTime = weatherProviderToNumber(hourlyTimes[i]);
         if (forecastTime == null) { continue; }
 
-        var dayIdx = weatherProviderFindDailyIndexForTime(dailyTimes, forecastTime, utcOffsetSeconds as Number);
-
         hourlySnapshot.add({
             "forecastTime" => forecastTime,
             "forecastHour" => weatherProviderGetForecastHour(forecastTime, utcOffsetSeconds as Number),
@@ -544,8 +557,6 @@ function weatherProviderBuildSnapshotFromOpenMeteoResponse(data as Dictionary, l
             "relativeHumidity" => weatherProviderGetHourlyNumber(hourly, "relative_humidity_2m", i),
             "windBearing" => weatherProviderGetHourlyNumber(hourly, "wind_direction_10m", i),
             "windSpeed" => weatherProviderGetHourlyFloat(hourly, "wind_speed_10m", i),
-            "highTemperature" => weatherProviderGetDailyNumber(daily, "temperature_2m_max", dayIdx),
-            "lowTemperature" => weatherProviderGetDailyNumber(daily, "temperature_2m_min", dayIdx),
             "uvIndex" => weatherProviderGetHourlyFloat(hourly, "uv_index", i)
         });
     }
@@ -595,21 +606,58 @@ function weatherProviderEncodeBackgroundCurrentEntry(entry as Dictionary?) as Ar
 }
 
 (:background)
-function weatherProviderEncodeBackgroundHourlyEntry(entry as Dictionary?) as Array? {
-    if (entry == null) { return null; }
+function weatherProviderEncodeBackgroundHourlyEntries(hourlyEntries as Array?, hourlyLimit as Number) as Array {
+    var hourly = [];
+    if (hourlyEntries == null || hourlyLimit <= 0) { return hourly; }
+
+    var startTime = null;
+    var count = 0;
+    var conditions = [];
+    var feelsLikeTemperatures = [];
+    var temperatures = [];
+    var precipitationChances = [];
+    var relativeHumidities = [];
+    var windBearings = [];
+    var windSpeeds = [];
+    var uvIndexes = [];
+
+    for (var i = 0; i < hourlyEntries.size() && count < hourlyLimit; i++) {
+        var entry = hourlyEntries[i] as Dictionary?;
+        if (entry == null) { continue; }
+
+        var forecastTime = weatherProviderToNumber(entry.get("forecastTime"));
+        if (forecastTime == null) { continue; }
+        if (startTime == null) { startTime = forecastTime; }
+
+        conditions.add(weatherProviderToNumber(entry.get("condition")));
+        feelsLikeTemperatures.add(weatherProviderToFloat(entry.get("feelsLikeTemperature")));
+
+        if (count < WEATHER_PROVIDER_DETAILED_HOURLY_FORECAST_LIMIT) {
+            temperatures.add(weatherProviderToNumber(entry.get("temperature")));
+            precipitationChances.add(weatherProviderToNumber(entry.get("precipitationChance")));
+            relativeHumidities.add(weatherProviderToNumber(entry.get("relativeHumidity")));
+            windBearings.add(weatherProviderToNumber(entry.get("windBearing")));
+            windSpeeds.add(weatherProviderToFloat(entry.get("windSpeed")));
+            uvIndexes.add(weatherProviderToFloat(entry.get("uvIndex")));
+        }
+
+        count++;
+    }
+
+    if (startTime == null || count == 0) { return hourly; }
 
     return [
-        weatherProviderToNumber(entry.get("forecastTime")),
-        weatherProviderToNumber(entry.get("condition")),
-        weatherProviderToNumber(entry.get("temperature")),
-        weatherProviderToFloat(entry.get("feelsLikeTemperature")),
-        weatherProviderToNumber(entry.get("precipitationChance")),
-        weatherProviderToNumber(entry.get("relativeHumidity")),
-        weatherProviderToNumber(entry.get("windBearing")),
-        weatherProviderToFloat(entry.get("windSpeed")),
-        weatherProviderToNumber(entry.get("highTemperature")),
-        weatherProviderToNumber(entry.get("lowTemperature")),
-        weatherProviderToFloat(entry.get("uvIndex"))
+        startTime,
+        count,
+        temperatures.size(),
+        conditions,
+        feelsLikeTemperatures,
+        temperatures,
+        precipitationChances,
+        relativeHumidities,
+        windBearings,
+        windSpeeds,
+        uvIndexes
     ];
 }
 
@@ -625,16 +673,7 @@ function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dict
         return null;
     }
 
-    var hourly = [];
-    var hourlyEntries = snapshot.get("hourly") as Array?;
-    if (hourlyEntries != null) {
-        for (var i = 0; i < hourlyEntries.size() && hourly.size() < hourlyLimit; i++) {
-            var encoded = weatherProviderEncodeBackgroundHourlyEntry(hourlyEntries[i] as Dictionary?);
-            if (encoded != null) {
-                hourly.add(encoded);
-            }
-        }
-    }
+    var hourly = weatherProviderEncodeBackgroundHourlyEntries(snapshot.get("hourly") as Array?, hourlyLimit);
 
     var timezone = weatherProviderToString(snapshot.get("timezone"));
     if (timezone == null) { timezone = "GMT"; }
@@ -647,11 +686,6 @@ function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dict
         "c" => current,
         "h" => hourly
     };
-}
-
-(:background)
-function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
-    return weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot, WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT);
 }
 
 (:background)
@@ -696,6 +730,50 @@ function weatherProviderDecodeBackgroundHourlyEntry(values as Array?, utcOffsetS
 }
 
 (:background)
+function weatherProviderDecodeBackgroundHourlyColumns(values as Array?, utcOffsetSeconds as Number) as Array {
+    var hourly = [];
+    if (values == null || values.size() < 5) { return hourly; }
+
+    var startTime = weatherProviderGetArrayNumber(values, 0);
+    var count = weatherProviderGetArrayNumber(values, 1);
+    var detailCount = weatherProviderGetArrayNumber(values, 2);
+    if (startTime == null || count == null || count <= 0) { return hourly; }
+    if (detailCount == null) { detailCount = 0; }
+
+    var conditions = values[3] as Array?;
+    var feelsLikeTemperatures = values[4] as Array?;
+    var temperatures = values.size() > 5 ? values[5] as Array? : null;
+    var precipitationChances = values.size() > 6 ? values[6] as Array? : null;
+    var relativeHumidities = values.size() > 7 ? values[7] as Array? : null;
+    var windBearings = values.size() > 8 ? values[8] as Array? : null;
+    var windSpeeds = values.size() > 9 ? values[9] as Array? : null;
+    var uvIndexes = values.size() > 10 ? values[10] as Array? : null;
+
+    for (var i = 0; i < count; i++) {
+        var forecastTime = (startTime as Number) + (i * 3600);
+        var entry = {
+            "forecastTime" => forecastTime,
+            "forecastHour" => weatherProviderGetForecastHour(forecastTime, utcOffsetSeconds),
+            "condition" => weatherProviderGetArrayNumber(conditions, i),
+            "feelsLikeTemperature" => weatherProviderGetArrayFloat(feelsLikeTemperatures, i)
+        };
+
+        if (i < (detailCount as Number)) {
+            entry["temperature"] = weatherProviderGetArrayNumber(temperatures, i);
+            entry["precipitationChance"] = weatherProviderGetArrayNumber(precipitationChances, i);
+            entry["relativeHumidity"] = weatherProviderGetArrayNumber(relativeHumidities, i);
+            entry["windBearing"] = weatherProviderGetArrayNumber(windBearings, i);
+            entry["windSpeed"] = weatherProviderGetArrayFloat(windSpeeds, i);
+            entry["uvIndex"] = weatherProviderGetArrayFloat(uvIndexes, i);
+        }
+
+        hourly.add(entry);
+    }
+
+    return hourly;
+}
+
+(:background)
 function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -713,10 +791,14 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
     var hourly = [];
     var hourlyEntries = snapshot.get("h") as Array?;
     if (hourlyEntries != null) {
-        for (var i = 0; i < hourlyEntries.size(); i++) {
-            var decoded = weatherProviderDecodeBackgroundHourlyEntry(hourlyEntries[i] as Array?, utcOffsetSeconds as Number);
-            if (decoded != null) {
-                hourly.add(decoded);
+        if (hourlyEntries.size() > 0 && !(hourlyEntries[0] instanceof Array)) {
+            hourly = weatherProviderDecodeBackgroundHourlyColumns(hourlyEntries, utcOffsetSeconds as Number);
+        } else {
+            for (var i = 0; i < hourlyEntries.size(); i++) {
+                var decoded = weatherProviderDecodeBackgroundHourlyEntry(hourlyEntries[i] as Array?, utcOffsetSeconds as Number);
+                if (decoded != null) {
+                    hourly.add(decoded);
+                }
             }
         }
     }
@@ -731,12 +813,6 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
         "current" => current,
         "hourly" => hourly
     };
-}
-
-(:background)
-function weatherProviderBuildBackgroundSuccessPayload(snapshot as Dictionary, lastAttemptAt as Number, lastSuccessAt as Number, locationSource as String?) as Dictionary? {
-    var encodedSnapshot = weatherProviderEncodeBackgroundSnapshot(snapshot);
-    return weatherProviderBuildBackgroundSuccessPayloadFromEncodedSnapshot(encodedSnapshot, lastAttemptAt, lastSuccessAt, locationSource);
 }
 
 (:background)

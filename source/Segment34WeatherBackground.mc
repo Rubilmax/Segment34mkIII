@@ -81,24 +81,43 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             );
             if (snapshot != null) {
                 var successAt = Time.now().value();
-                var successPayload = weatherProviderBuildBackgroundSuccessPayload(
+                if (tryExitBackgroundSuccessPayload(
                     snapshot,
                     lastAttemptAt as Number,
                     successAt,
-                    locationSource
-                );
-                if (successPayload != null && tryExitBackgroundPayload(successPayload)) {
+                    locationSource,
+                    WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT
+                )) {
                     return;
                 }
 
-                var fallbackPayload = weatherProviderBuildBackgroundSuccessPayloadWithHourlyLimit(
+                if (tryExitBackgroundSuccessPayload(
                     snapshot,
                     lastAttemptAt as Number,
                     successAt,
                     locationSource,
                     WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT
-                );
-                if (fallbackPayload != null && tryExitBackgroundPayload(fallbackPayload)) {
+                )) {
+                    return;
+                }
+
+                if (tryExitBackgroundSuccessPayload(
+                    snapshot,
+                    lastAttemptAt as Number,
+                    successAt,
+                    locationSource,
+                    WEATHER_PROVIDER_BACKGROUND_SECONDARY_FALLBACK_HOURLY_LIMIT
+                )) {
+                    return;
+                }
+
+                if (tryExitBackgroundSuccessPayload(
+                    snapshot,
+                    lastAttemptAt as Number,
+                    successAt,
+                    locationSource,
+                    WEATHER_PROVIDER_BACKGROUND_EMPTY_HOURLY_LIMIT
+                )) {
                     return;
                 }
             }
@@ -118,6 +137,38 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             responseCode,
             locationSource
         ));
+    }
+
+    hidden function tryExitBackgroundSuccessPayload(snapshot as Dictionary, lastAttemptAt as Number, successAt as Number, locationSource as String?, hourlyLimit as Number) as Boolean {
+        var payload = weatherProviderBuildBackgroundSuccessPayloadWithHourlyLimit(
+            snapshot,
+            lastAttemptAt,
+            successAt,
+            locationSource,
+            hourlyLimit
+        );
+        if (payload == null) {
+            logOpenMeteoBackgroundExitPath("skipped", hourlyLimit);
+            return false;
+        }
+
+        logOpenMeteoBackgroundExitPath("attempt", hourlyLimit);
+        if (tryExitBackgroundPayload(payload)) {
+            logOpenMeteoBackgroundExitPath("accepted", hourlyLimit);
+            return true;
+        }
+
+        logOpenMeteoBackgroundExitPath("rejected", hourlyLimit);
+        return false;
+    }
+
+    hidden function logOpenMeteoBackgroundExitPath(action as String, hourlyLimit as Number) as Void {
+        System.println(
+            "Open-Meteo Background.exit "
+            + action
+            + ": hourlyLimit="
+            + hourlyLimit.format("%d")
+        );
     }
 
     hidden function tryExitBackgroundPayload(payload as Object or Null) as Boolean {
