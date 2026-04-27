@@ -31,8 +31,10 @@ const WEATHER_PROVIDER_STALE_AFTER_S = 28800;
 (:background)
 const WEATHER_PROVIDER_IMMEDIATE_GUARD_S = 300;
 (:background)
-const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 32;
-// A 32-hour hourly window can spill into a third local calendar day late in the day.
+const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 8;
+(:background)
+const WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT = 0;
+// The hourly window can spill into the next local calendar day late in the day.
 (:background)
 const WEATHER_PROVIDER_FORECAST_DAYS = 3;
 (:background)
@@ -612,7 +614,7 @@ function weatherProviderEncodeBackgroundHourlyEntry(entry as Dictionary?) as Arr
 }
 
 (:background)
-function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
+function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dictionary?, hourlyLimit as Number) as Dictionary? {
     if (snapshot == null) { return null; }
 
     var location = weatherProviderNormalizeLocation(snapshot.get("location") as Array?);
@@ -626,7 +628,7 @@ function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
     var hourly = [];
     var hourlyEntries = snapshot.get("hourly") as Array?;
     if (hourlyEntries != null) {
-        for (var i = 0; i < hourlyEntries.size(); i++) {
+        for (var i = 0; i < hourlyEntries.size() && hourly.size() < hourlyLimit; i++) {
             var encoded = weatherProviderEncodeBackgroundHourlyEntry(hourlyEntries[i] as Dictionary?);
             if (encoded != null) {
                 hourly.add(encoded);
@@ -645,6 +647,11 @@ function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
         "c" => current,
         "h" => hourly
     };
+}
+
+(:background)
+function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
+    return weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot, WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT);
 }
 
 (:background)
@@ -729,6 +736,17 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
 (:background)
 function weatherProviderBuildBackgroundSuccessPayload(snapshot as Dictionary, lastAttemptAt as Number, lastSuccessAt as Number, locationSource as String?) as Dictionary? {
     var encodedSnapshot = weatherProviderEncodeBackgroundSnapshot(snapshot);
+    return weatherProviderBuildBackgroundSuccessPayloadFromEncodedSnapshot(encodedSnapshot, lastAttemptAt, lastSuccessAt, locationSource);
+}
+
+(:background)
+function weatherProviderBuildBackgroundSuccessPayloadWithHourlyLimit(snapshot as Dictionary, lastAttemptAt as Number, lastSuccessAt as Number, locationSource as String?, hourlyLimit as Number) as Dictionary? {
+    var encodedSnapshot = weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot, hourlyLimit);
+    return weatherProviderBuildBackgroundSuccessPayloadFromEncodedSnapshot(encodedSnapshot, lastAttemptAt, lastSuccessAt, locationSource);
+}
+
+(:background)
+function weatherProviderBuildBackgroundSuccessPayloadFromEncodedSnapshot(encodedSnapshot as Dictionary?, lastAttemptAt as Number, lastSuccessAt as Number, locationSource as String?) as Dictionary? {
     if (encodedSnapshot == null) { return null; }
 
     return {

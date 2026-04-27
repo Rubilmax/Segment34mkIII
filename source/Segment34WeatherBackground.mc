@@ -25,7 +25,7 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         var locationSource = resolvedLocation.get("source") as String?;
 
         if (location == null) {
-            Background.exit(weatherProviderBuildBackgroundFailurePayload(
+            exitBackgroundPayload(weatherProviderBuildBackgroundFailurePayload(
                 WEATHER_PROVIDER_BACKGROUND_RESULT_LOCATION_UNAVAILABLE,
                 now,
                 null,
@@ -58,7 +58,7 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
                 -1,
                 options.get(:context) as Dictionary
             );
-            Background.exit(weatherProviderBuildBackgroundFailurePayload(
+            exitBackgroundPayload(weatherProviderBuildBackgroundFailurePayload(
                 WEATHER_PROVIDER_BACKGROUND_RESULT_REQUEST_FAILED,
                 now,
                 -1,
@@ -80,19 +80,25 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
                 weatherProviderToNumber(responseContext.get("fetchedAt")) as Number
             );
             if (snapshot != null) {
+                var successAt = Time.now().value();
                 var successPayload = weatherProviderBuildBackgroundSuccessPayload(
                     snapshot,
                     lastAttemptAt as Number,
-                    Time.now().value(),
+                    successAt,
                     locationSource
                 );
-                if (successPayload != null) {
-                    // Known limitation: background storage writes are currently unavailable for
-                    // this flow, so the snapshot must be passed back through Background.exit()
-                    // and persisted later in AppBase.onBackgroundData(). If multiple background
-                    // runs happen while the foreground app is inactive, only the latest payload
-                    // is delivered, so a later failure can overwrite an earlier success.
-                    Background.exit(successPayload);
+                if (successPayload != null && tryExitBackgroundPayload(successPayload)) {
+                    return;
+                }
+
+                var fallbackPayload = weatherProviderBuildBackgroundSuccessPayloadWithHourlyLimit(
+                    snapshot,
+                    lastAttemptAt as Number,
+                    successAt,
+                    locationSource,
+                    WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT
+                );
+                if (fallbackPayload != null && tryExitBackgroundPayload(fallbackPayload)) {
                     return;
                 }
             }
@@ -106,12 +112,29 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         }
 
         logOpenMeteoRequestFailure(errorMessage, responseCode, responseContext);
-        Background.exit(weatherProviderBuildBackgroundFailurePayload(
+        exitBackgroundPayload(weatherProviderBuildBackgroundFailurePayload(
             failureReason,
             lastAttemptAt as Number,
             responseCode,
             locationSource
         ));
+    }
+
+    hidden function tryExitBackgroundPayload(payload as Object or Null) as Boolean {
+        try {
+            Background.exit(payload);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    }
+
+    hidden function exitBackgroundPayload(payload as Object or Null) as Void {
+        if (tryExitBackgroundPayload(payload)) { return; }
+
+        try {
+            Background.exit(null);
+        } catch(e) {}
     }
 
     hidden function resolveWeatherLocation() as Dictionary {
