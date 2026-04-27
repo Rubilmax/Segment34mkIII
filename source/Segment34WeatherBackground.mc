@@ -50,7 +50,7 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
                 WEATHER_PROVIDER_OPEN_METEO_URL,
                 weatherProviderBuildOpenMeteoParams(location),
                 options,
-                method(:onWeatherResponse)
+                self.method(:onWeatherResponse)
             );
         } catch(e) {
             logOpenMeteoRequestFailure(
@@ -67,7 +67,7 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         }
     }
 
-    hidden function onWeatherResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null, context as Object) as Void {
+    function onWeatherResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null, context as Object) as Void {
         var responseContext = context as Dictionary;
         var location = responseContext.get("location") as Array?;
         var locationSource = responseContext.get("locationSource") as String?;

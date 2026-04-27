@@ -4,9 +4,11 @@ import Toybox.Lang;
 import Toybox.System;
 import Toybox.WatchUi;
 
+(:background)
 class Segment34App extends Application.AppBase {
     
-    var mView;
+    (:typecheck(disableBackgroundCheck))
+    var mView as Segment34View or Null;
     
     function initialize() {
         AppBase.initialize();
