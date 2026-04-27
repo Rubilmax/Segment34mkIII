@@ -2137,21 +2137,33 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function loadCustomWeatherSnapshot() as Dictionary? {
-        return weatherProviderLoadSnapshot();
+        try {
+            return weatherProviderLoadSnapshot();
+        } catch(e) {
+            System.println("Open-Meteo snapshot load failure: " + e);
+            weatherProviderDeleteSnapshot();
+        }
+        return null;
     }
 
     hidden function applyCustomWeatherSnapshot(snapshot as Dictionary?) as Void {
         clearCustomWeatherData();
         if (snapshot == null) { return; }
 
-        var location = weatherProviderBuildLocation(snapshot.get("location") as Array?);
-        weatherCondition = buildForecastWeatherFromSnapshotEntry(snapshot.get("current") as Dictionary?, location);
+        try {
+            var location = weatherProviderBuildLocation(snapshot.get("location") as Array?);
+            weatherCondition = buildForecastWeatherFromSnapshotEntry(snapshot.get("current") as Dictionary?, location);
 
-        var hourly = snapshot.get("hourly") as Array?;
-        if (hourly == null) { return; }
+            var hourly = snapshot.get("hourly") as Array?;
+            if (hourly == null) { return; }
 
-        for (var i = 0; i < hourly.size(); i++) {
-            cachedHourlyForecast.add(buildForecastWeatherFromSnapshotEntry(hourly[i] as Dictionary?, location));
+            for (var i = 0; i < hourly.size(); i++) {
+                cachedHourlyForecast.add(buildForecastWeatherFromSnapshotEntry(hourly[i] as Dictionary?, location));
+            }
+        } catch(e) {
+            clearCustomWeatherData();
+            System.println("Open-Meteo snapshot apply failure: " + e);
+            weatherProviderDeleteSnapshot();
         }
     }
 

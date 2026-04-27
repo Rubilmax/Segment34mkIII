@@ -131,13 +131,21 @@ function weatherProviderIsWeatherRequired() as Boolean {
 (:background)
 function weatherProviderToNumber(value) as Number? {
     if (value == null) { return null; }
-    return value.toNumber();
+    if (value instanceof Number) { return value as Number; }
+    try {
+        return value.toNumber();
+    } catch(e) {}
+    return null;
 }
 
 (:background)
 function weatherProviderToFloat(value) as Float? {
     if (value == null) { return null; }
-    return value.toFloat();
+    if (value instanceof Float) { return value as Float; }
+    try {
+        return value.toFloat();
+    } catch(e) {}
+    return null;
 }
 
 (:background)
@@ -146,7 +154,10 @@ function weatherProviderToString(value) as String? {
     if (value instanceof String) {
         return value as String;
     }
-    return value.toString();
+    try {
+        return value.toString();
+    } catch(e) {}
+    return null;
 }
 
 (:background)
@@ -242,6 +253,15 @@ function weatherProviderLoadSnapshot() as Dictionary? {
 (:background)
 function weatherProviderStoreSnapshot(snapshot as Dictionary) as Void {
     Application.Storage.setValue(WEATHER_SNAPSHOT_KEY, snapshot);
+}
+
+(:background)
+function weatherProviderDeleteSnapshot() as Void {
+    try {
+        Application.Storage.deleteValue(WEATHER_SNAPSHOT_KEY);
+    } catch(e) {
+        System.println("Open-Meteo snapshot delete failure: " + e);
+    }
 }
 
 (:background)
@@ -353,8 +373,20 @@ function weatherProviderBuildOpenMeteoParams(location as Array?) as Dictionary {
 
 (:background)
 function weatherProviderGetArrayValue(values as Array?, index as Number) {
-    if (values == null || index < 0 || index >= values.size()) { return null; }
-    return values[index];
+    if (values == null || index < 0 || index >= weatherProviderGetArraySize(values)) { return null; }
+    try {
+        return values[index];
+    } catch(e) {}
+    return null;
+}
+
+(:background)
+function weatherProviderGetArraySize(values as Array?) as Number {
+    if (values == null) { return 0; }
+    try {
+        return values.size();
+    } catch(e) {}
+    return 0;
 }
 
 (:background)
@@ -684,7 +716,8 @@ function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dict
         "z" => timezone,
         "o" => utcOffsetSeconds,
         "c" => current,
-        "h" => hourly
+        "h" => [],
+        "q" => hourly
     };
 }
 
@@ -732,7 +765,7 @@ function weatherProviderDecodeBackgroundHourlyEntry(values as Array?, utcOffsetS
 (:background)
 function weatherProviderDecodeBackgroundHourlyColumns(values as Array?, utcOffsetSeconds as Number) as Array {
     var hourly = [];
-    if (values == null || values.size() < 5) { return hourly; }
+    if (weatherProviderGetArraySize(values) < 5) { return hourly; }
 
     var startTime = weatherProviderGetArrayNumber(values, 0);
     var count = weatherProviderGetArrayNumber(values, 1);
@@ -740,14 +773,15 @@ function weatherProviderDecodeBackgroundHourlyColumns(values as Array?, utcOffse
     if (startTime == null || count == null || count <= 0) { return hourly; }
     if (detailCount == null) { detailCount = 0; }
 
-    var conditions = values[3] as Array?;
-    var feelsLikeTemperatures = values[4] as Array?;
-    var temperatures = values.size() > 5 ? values[5] as Array? : null;
-    var precipitationChances = values.size() > 6 ? values[6] as Array? : null;
-    var relativeHumidities = values.size() > 7 ? values[7] as Array? : null;
-    var windBearings = values.size() > 8 ? values[8] as Array? : null;
-    var windSpeeds = values.size() > 9 ? values[9] as Array? : null;
-    var uvIndexes = values.size() > 10 ? values[10] as Array? : null;
+    var conditions = weatherProviderGetArrayValue(values, 3) as Array?;
+    var feelsLikeTemperatures = weatherProviderGetArrayValue(values, 4) as Array?;
+    var valueCount = weatherProviderGetArraySize(values);
+    var temperatures = valueCount > 5 ? weatherProviderGetArrayValue(values, 5) as Array? : null;
+    var precipitationChances = valueCount > 6 ? weatherProviderGetArrayValue(values, 6) as Array? : null;
+    var relativeHumidities = valueCount > 7 ? weatherProviderGetArrayValue(values, 7) as Array? : null;
+    var windBearings = valueCount > 8 ? weatherProviderGetArrayValue(values, 8) as Array? : null;
+    var windSpeeds = valueCount > 9 ? weatherProviderGetArrayValue(values, 9) as Array? : null;
+    var uvIndexes = valueCount > 10 ? weatherProviderGetArrayValue(values, 10) as Array? : null;
 
     for (var i = 0; i < count; i++) {
         var forecastTime = (startTime as Number) + (i * 3600);
@@ -774,6 +808,21 @@ function weatherProviderDecodeBackgroundHourlyColumns(values as Array?, utcOffse
 }
 
 (:background)
+function weatherProviderTryGetArrayNumber(values as Array?, index as Number) as Number? {
+    try {
+        return weatherProviderGetArrayNumber(values, index);
+    } catch(e) {}
+    return null;
+}
+
+(:background)
+function weatherProviderIsBackgroundHourlyColumns(values as Array?) as Boolean {
+    if (weatherProviderGetArraySize(values) < 5) { return false; }
+    return weatherProviderTryGetArrayNumber(values, 0) != null
+        && weatherProviderTryGetArrayNumber(values, 1) != null;
+}
+
+(:background)
 function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -789,13 +838,19 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
     if (timezone == null) { timezone = "GMT"; }
 
     var hourly = [];
+    var hourlyColumns = snapshot.get("q") as Array?;
+    if (weatherProviderIsBackgroundHourlyColumns(hourlyColumns)) {
+        hourly = weatherProviderDecodeBackgroundHourlyColumns(hourlyColumns, utcOffsetSeconds as Number);
+    }
+
     var hourlyEntries = snapshot.get("h") as Array?;
-    if (hourlyEntries != null) {
-        if (hourlyEntries.size() > 0 && !(hourlyEntries[0] instanceof Array)) {
+    if (hourly.size() == 0 && hourlyEntries != null) {
+        if (weatherProviderIsBackgroundHourlyColumns(hourlyEntries)) {
             hourly = weatherProviderDecodeBackgroundHourlyColumns(hourlyEntries, utcOffsetSeconds as Number);
         } else {
-            for (var i = 0; i < hourlyEntries.size(); i++) {
-                var decoded = weatherProviderDecodeBackgroundHourlyEntry(hourlyEntries[i] as Array?, utcOffsetSeconds as Number);
+            var hourlyEntryCount = weatherProviderGetArraySize(hourlyEntries);
+            for (var i = 0; i < hourlyEntryCount; i++) {
+                var decoded = weatherProviderDecodeBackgroundHourlyEntry(weatherProviderGetArrayValue(hourlyEntries, i) as Array?, utcOffsetSeconds as Number);
                 if (decoded != null) {
                     hourly.add(decoded);
                 }

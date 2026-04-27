@@ -61,7 +61,17 @@ class Segment34App extends Application.AppBase {
 
     (:typecheck(disableBackgroundCheck))
     function onBackgroundData(data) as Void {
-        weatherProviderApplyBackgroundPayload(data);
+        var applied = false;
+        try {
+            applied = weatherProviderApplyBackgroundPayload(data);
+        } catch(e) {
+            System.println("Open-Meteo background payload apply failure: " + e);
+        }
+
+        if (!applied) {
+            return;
+        }
+
         if (mView != null) {
             mView.onWeatherDataChanged();
         }
