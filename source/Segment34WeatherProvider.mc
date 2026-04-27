@@ -4,21 +4,12 @@ import Toybox.Lang;
 import Toybox.Position;
 import Toybox.System;
 import Toybox.Time;
-import Toybox.Weather;
 using Toybox.Position;
 
-// The background weather service and the foreground watch face share this helper
-// surface, so every exported weather-provider symbol must be linked into the
-// background process explicitly.
-(:background)
 const WEATHER_PROVIDER_GARMIN = 0;
-(:background)
 const WEATHER_PROVIDER_OPEN_METEO = 1;
-(:background)
 const WEATHER_PROVIDER_STATE_KEY = "weather_provider_state_v1";
-(:background)
 const WEATHER_SNAPSHOT_KEY = "weather_snapshot_v2";
-(:background)
 const WEATHER_PROVIDER_LEGACY_GARMIN_LOCATION_KEY = "garmin_weather_location_v1";
 (:background)
 const WEATHER_PROVIDER_OPEN_METEO_NAME = "open_meteo_best_match";
@@ -26,9 +17,7 @@ const WEATHER_PROVIDER_OPEN_METEO_NAME = "open_meteo_best_match";
 const WEATHER_SNAPSHOT_VERSION = 2;
 (:background)
 const WEATHER_PROVIDER_FETCH_INTERVAL_S = 1800;
-(:background)
 const WEATHER_PROVIDER_STALE_AFTER_S = 28800;
-(:background)
 const WEATHER_PROVIDER_IMMEDIATE_GUARD_S = 300;
 (:background)
 const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 32;
@@ -60,26 +49,22 @@ const WEATHER_PROVIDER_BACKGROUND_RESULT_INVALID_RESPONSE = 2;
 (:background)
 const WEATHER_PROVIDER_BACKGROUND_RESULT_REQUEST_FAILED = 3;
 
-(:background)
 function weatherProviderGetSelection() as Number {
     var provider = Application.Properties.getValue("weatherProvider");
     if (provider == null) { return WEATHER_PROVIDER_GARMIN; }
     return provider as Number;
 }
 
-(:background)
 function weatherProviderUsesOpenMeteo() as Boolean {
     return weatherProviderGetSelection() == WEATHER_PROVIDER_OPEN_METEO;
 }
 
-(:background)
 function weatherProviderGetPropertyOrDefault(key as String, defaultValue) {
     var value = Application.Properties.getValue(key);
     if (value == null) { return defaultValue; }
     return value;
 }
 
-(:background)
 function weatherProviderIsWeatherSourceId(id as Number) as Boolean {
     if (id == 20 || id == 39 || id == 40 || (id >= 43 && id <= 55) || (id >= 63 && id <= 79)) {
         return true;
@@ -87,12 +72,10 @@ function weatherProviderIsWeatherSourceId(id as Number) as Boolean {
     return false;
 }
 
-(:background)
 function weatherProviderPropertyNeedsWeather(key as String, defaultValue as Number) as Boolean {
     return weatherProviderIsWeatherSourceId(weatherProviderGetPropertyOrDefault(key, defaultValue) as Number);
 }
 
-(:background)
 function weatherProviderIsWeatherRequired() as Boolean {
     if (weatherProviderPropertyNeedsWeather("sunriseFieldShows", 39)) { return true; }
     if (weatherProviderPropertyNeedsWeather("sunsetFieldShows", 40)) { return true; }
@@ -149,7 +132,6 @@ function weatherProviderNormalizeLocation(location as Array?) as Array<Float>? {
     return [(location[0] as Number).toFloat(), (location[1] as Number).toFloat()];
 }
 
-(:background)
 function weatherProviderDeleteLegacyLocationData() as Void {
     Application.Storage.deleteValue(WEATHER_PROVIDER_LEGACY_GARMIN_LOCATION_KEY);
 
@@ -169,7 +151,6 @@ function weatherProviderDeleteLegacyLocationData() as Void {
     ));
 }
 
-(:background)
 function weatherProviderBuildLocation(location as Array?) as Position.Location or Null {
     var normalized = weatherProviderNormalizeLocation(location);
     if (normalized == null) { return null; }
@@ -180,12 +161,10 @@ function weatherProviderBuildLocation(location as Array?) as Position.Location o
     });
 }
 
-(:background)
 function weatherProviderLoadState() as Dictionary? {
     return Application.Storage.getValue(WEATHER_PROVIDER_STATE_KEY) as Dictionary?;
 }
 
-(:background)
 function weatherProviderLoadOpenMeteoState() as Dictionary? {
     var state = weatherProviderLoadState();
     if (state == null) { return null; }
@@ -193,12 +172,10 @@ function weatherProviderLoadOpenMeteoState() as Dictionary? {
     return state;
 }
 
-(:background)
 function weatherProviderStoreState(state as Dictionary) as Void {
     Application.Storage.setValue(WEATHER_PROVIDER_STATE_KEY, state);
 }
 
-(:background)
 function weatherProviderBuildState(provider as String, lastAttemptAt as Number?, lastSuccessAt as Number?, lastErrorCode as Number?, lastErrorMessage as String?, locationSource as String?) as Dictionary {
     return {
         "provider" => provider,
@@ -210,7 +187,6 @@ function weatherProviderBuildState(provider as String, lastAttemptAt as Number?,
     };
 }
 
-(:background)
 function weatherProviderLoadSnapshotRaw() as Dictionary? {
     var snapshot = Application.Storage.getValue(WEATHER_SNAPSHOT_KEY) as Dictionary?;
     if (snapshot == null) { return null; }
@@ -219,7 +195,6 @@ function weatherProviderLoadSnapshotRaw() as Dictionary? {
     return snapshot;
 }
 
-(:background)
 function weatherProviderLoadSnapshot() as Dictionary? {
     var snapshot = weatherProviderLoadSnapshotRaw();
     if (snapshot == null) { return null; }
@@ -231,17 +206,14 @@ function weatherProviderLoadSnapshot() as Dictionary? {
     return snapshot;
 }
 
-(:background)
 function weatherProviderStoreSnapshot(snapshot as Dictionary) as Void {
     Application.Storage.setValue(WEATHER_SNAPSHOT_KEY, snapshot);
 }
 
-(:background)
 function weatherProviderHasScheduledRefresh() as Boolean {
     return Background.getTemporalEventRegisteredTime() != null;
 }
 
-(:background)
 function weatherProviderHasImmediateRefreshScheduled() as Boolean {
     var registered = Background.getTemporalEventRegisteredTime();
     if (registered == null) { return false; }
@@ -269,7 +241,6 @@ function weatherProviderLogSchedulingFailure(operation as String, error) as Void
     System.println("Open-Meteo scheduling failure: operation=" + operation + ", error=" + errorText);
 }
 
-(:background)
 function weatherProviderDeleteScheduledRefresh() as Void {
     if (!weatherProviderHasScheduledRefresh()) { return; }
 
@@ -287,7 +258,6 @@ function weatherProviderScheduleNextRefresh() as Void {
     }
 }
 
-(:background)
 function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
         weatherProviderDeleteScheduledRefresh();
@@ -465,7 +435,6 @@ function weatherProviderGetHourlyFloat(hourly as Dictionary?, key as String, ind
     return weatherProviderGetArrayFloat(hourly.get(key) as Array?, index);
 }
 
-(:background)
 function weatherProviderLastFailureWasLocationUnavailable(state as Dictionary?) as Boolean {
     if (state == null) { return false; }
 
@@ -567,7 +536,6 @@ function weatherProviderEncodeBackgroundLocationSource(source as String?) as Num
     return 2;
 }
 
-(:background)
 function weatherProviderDecodeBackgroundLocationSource(code as Number?) as String {
     if (code == 0) { return WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE; }
     if (code == 1) { return WEATHER_PROVIDER_LOCATION_SOURCE_GARMIN_CACHE; }
@@ -647,7 +615,6 @@ function weatherProviderEncodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
     };
 }
 
-(:background)
 function weatherProviderDecodeBackgroundCurrentEntry(values as Array?) as Dictionary? {
     if (values == null) { return null; }
 
@@ -665,7 +632,6 @@ function weatherProviderDecodeBackgroundCurrentEntry(values as Array?) as Dictio
     };
 }
 
-(:background)
 function weatherProviderDecodeBackgroundHourlyEntry(values as Array?, utcOffsetSeconds as Number) as Dictionary? {
     if (values == null) { return null; }
 
@@ -688,7 +654,6 @@ function weatherProviderDecodeBackgroundHourlyEntry(values as Array?, utcOffsetS
     };
 }
 
-(:background)
 function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -769,7 +734,6 @@ function weatherProviderBuildBackgroundErrorMessage(reason as Number, responseCo
     return WEATHER_PROVIDER_ERROR_REQUEST_FAILED;
 }
 
-(:background)
 function weatherProviderApplyBackgroundPayload(data) as Boolean {
     if (!(data instanceof Dictionary)) { return false; }
 
@@ -831,7 +795,6 @@ function weatherProviderApplyBackgroundPayload(data) as Boolean {
     return false;
 }
 
-(:background)
 function weatherProviderTruncateString(value as String?, maxLength as Number) as String? {
     if (value == null) { return null; }
     if (value.length() <= maxLength) { return value; }
