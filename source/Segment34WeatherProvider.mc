@@ -81,6 +81,11 @@ function weatherProviderUsesOpenMeteo() as Boolean {
 }
 
 (:background)
+function weatherProviderIsOpenMeteoProviderName(provider as String?) as Boolean {
+    return provider != null && provider.equals(WEATHER_PROVIDER_OPEN_METEO_NAME);
+}
+
+(:background)
 function weatherProviderGetPropertyOrDefault(key as String, defaultValue) {
     var value = Application.Properties.getValue(key);
     if (value == null) { return defaultValue; }
@@ -208,7 +213,11 @@ function weatherProviderLoadState() as Dictionary? {
 function weatherProviderLoadOpenMeteoState() as Dictionary? {
     var state = weatherProviderLoadState();
     if (state == null) { return null; }
-    if ((state.get("provider") as String?) != WEATHER_PROVIDER_OPEN_METEO_NAME) { return null; }
+    var provider = weatherProviderToString(state.get("provider"));
+    if (!weatherProviderIsOpenMeteoProviderName(provider)) {
+        System.println("Open-Meteo state ignored: provider=" + ((provider == null) ? "null" : provider));
+        return null;
+    }
     return state;
 }
 
@@ -233,8 +242,19 @@ function weatherProviderBuildState(provider as String, lastAttemptAt as Number?,
 function weatherProviderLoadSnapshotRaw() as Dictionary? {
     var snapshot = Application.Storage.getValue(WEATHER_SNAPSHOT_KEY) as Dictionary?;
     if (snapshot == null) { return null; }
-    if ((snapshot.get("version") as Number?) != WEATHER_SNAPSHOT_VERSION) { return null; }
-    if ((snapshot.get("provider") as String?) != WEATHER_PROVIDER_OPEN_METEO_NAME) { return null; }
+
+    var version = weatherProviderToNumber(snapshot.get("version"));
+    if (version != WEATHER_SNAPSHOT_VERSION) {
+        System.println("Open-Meteo snapshot ignored: version=" + ((version == null) ? "null" : version.format("%d")));
+        return null;
+    }
+
+    var provider = weatherProviderToString(snapshot.get("provider"));
+    if (!weatherProviderIsOpenMeteoProviderName(provider)) {
+        System.println("Open-Meteo snapshot ignored: provider=" + ((provider == null) ? "null" : provider));
+        return null;
+    }
+
     return snapshot;
 }
 
@@ -502,6 +522,28 @@ function weatherProviderGetDailyNumber(daily as Dictionary?, key as String, inde
 }
 
 (:background)
+function weatherProviderBuildSunEvents(daily as Dictionary?, dailyTimes as Array?, utcOffsetSeconds as Number) as Array {
+    var sunEvents = [];
+    if (daily == null || dailyTimes == null) { return sunEvents; }
+
+    var dailyCount = weatherProviderGetArraySize(dailyTimes);
+    for (var i = 0; i < dailyCount; i++) {
+        var dayTime = weatherProviderGetArrayNumber(dailyTimes, i);
+        var sunrise = weatherProviderGetDailyNumber(daily, "sunrise", i);
+        var sunset = weatherProviderGetDailyNumber(daily, "sunset", i);
+        if (dayTime == null || sunrise == null || sunset == null) { continue; }
+
+        sunEvents.add([
+            weatherProviderGetLocalDayStart(dayTime as Number, utcOffsetSeconds),
+            sunrise,
+            sunset
+        ]);
+    }
+
+    return sunEvents;
+}
+
+(:background)
 function weatherProviderGetHourlyNumber(hourly as Dictionary?, key as String, index as Number) as Number? {
     if (hourly == null) { return null; }
     return weatherProviderGetArrayNumber(hourly.get(key) as Array?, index);
@@ -561,6 +603,8 @@ function weatherProviderBuildSnapshotFromOpenMeteoResponse(data as Dictionary, l
         currentPrecipitationChance = weatherProviderGetHourlyNumber(hourly, "precipitation_probability", nearestHourlyIdx);
     }
 
+    var sunEvents = weatherProviderBuildSunEvents(daily, dailyTimes, utcOffsetSeconds as Number);
+
     var currentSnapshot = {
         "condition" => weatherProviderWmoToGarminCondition(weatherProviderToNumber(current.get("weather_code"))),
         "temperature" => weatherProviderToNumber(current.get("temperature_2m")),
@@ -608,14 +652,15 @@ function weatherProviderBuildSnapshotFromOpenMeteoResponse(data as Dictionary, l
         "timezone" => timezone,
         "utcOffsetSeconds" => utcOffsetSeconds,
         "current" => currentSnapshot,
+        "sunEvents" => sunEvents,
         "hourly" => hourlySnapshot
     };
 }
 
 (:background)
 function weatherProviderEncodeBackgroundLocationSource(source as String?) as Number {
-    if (source == WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE) { return 0; }
-    if (source == WEATHER_PROVIDER_LOCATION_SOURCE_GARMIN_CACHE) { return 1; }
+    if (source != null && source.equals(WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE)) { return 0; }
+    if (source != null && source.equals(WEATHER_PROVIDER_LOCATION_SOURCE_GARMIN_CACHE)) { return 1; }
     return 2;
 }
 
@@ -701,6 +746,26 @@ function weatherProviderEncodeBackgroundHourlyEntries(hourlyEntries as Array?, h
 }
 
 (:background)
+function weatherProviderEncodeBackgroundSunEvents(entries as Array?) as Array {
+    var encoded = [];
+    if (entries == null) { return encoded; }
+
+    for (var i = 0; i < entries.size(); i++) {
+        var entry = entries[i] as Array?;
+        if (entry == null || entry.size() < 3) { continue; }
+
+        var dayStart = weatherProviderGetArrayNumber(entry, 0);
+        var sunrise = weatherProviderGetArrayNumber(entry, 1);
+        var sunset = weatherProviderGetArrayNumber(entry, 2);
+        if (dayStart == null || sunrise == null || sunset == null) { continue; }
+
+        encoded.add([dayStart, sunrise, sunset]);
+    }
+
+    return encoded;
+}
+
+(:background)
 function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dictionary?, hourlyLimit as Number) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -723,6 +788,7 @@ function weatherProviderEncodeBackgroundSnapshotWithHourlyLimit(snapshot as Dict
         "z" => timezone,
         "o" => utcOffsetSeconds,
         "c" => current,
+        "d" => weatherProviderEncodeBackgroundSunEvents(snapshot.get("sunEvents") as Array?),
         "h" => [],
         "q" => hourly
     };
@@ -815,6 +881,26 @@ function weatherProviderDecodeBackgroundHourlyColumns(values as Array?, utcOffse
 }
 
 (:background)
+function weatherProviderDecodeBackgroundSunEvents(values as Array?) as Array {
+    var sunEvents = [];
+    var eventCount = weatherProviderGetArraySize(values);
+
+    for (var i = 0; i < eventCount; i++) {
+        var entry = weatherProviderGetArrayValue(values, i) as Array?;
+        if (entry == null || weatherProviderGetArraySize(entry) < 3) { continue; }
+
+        var dayStart = weatherProviderGetArrayNumber(entry, 0);
+        var sunrise = weatherProviderGetArrayNumber(entry, 1);
+        var sunset = weatherProviderGetArrayNumber(entry, 2);
+        if (dayStart == null || sunrise == null || sunset == null) { continue; }
+
+        sunEvents.add([dayStart, sunrise, sunset]);
+    }
+
+    return sunEvents;
+}
+
+(:background)
 function weatherProviderTryGetArrayNumber(values as Array?, index as Number) as Number? {
     try {
         return weatherProviderGetArrayNumber(values, index);
@@ -873,6 +959,7 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
         "timezone" => timezone,
         "utcOffsetSeconds" => utcOffsetSeconds,
         "current" => current,
+        "sunEvents" => weatherProviderDecodeBackgroundSunEvents(snapshot.get("d") as Array?),
         "hourly" => hourly
     };
 }
@@ -972,6 +1059,15 @@ function weatherProviderApplyBackgroundPayload(data) as Boolean {
             null,
             locationSource
         ));
+        var hourly = snapshot.get("hourly") as Array?;
+        var sunEvents = snapshot.get("sunEvents") as Array?;
+        System.println(
+            "Open-Meteo background payload stored"
+            + ": successAt=" + (successAt as Number).format("%d")
+            + ", hourly=" + weatherProviderGetArraySize(hourly).format("%d")
+            + ", sunEvents=" + weatherProviderGetArraySize(sunEvents).format("%d")
+            + ", locationSource=" + locationSource
+        );
         return true;
     }
 
