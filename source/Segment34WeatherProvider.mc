@@ -309,6 +309,7 @@ function weatherProviderDeleteScheduledRefresh() as Void {
 (:background)
 function weatherProviderScheduleNextRefresh() as Void {
     try {
+        System.println("Open-Meteo schedule next refresh: delay=" + WEATHER_PROVIDER_FETCH_INTERVAL_S.format("%d"));
         Background.registerForTemporalEvent(new Time.Duration(WEATHER_PROVIDER_FETCH_INTERVAL_S));
     } catch(e) {
         weatherProviderLogSchedulingFailure("next_refresh", e);
@@ -318,11 +319,13 @@ function weatherProviderScheduleNextRefresh() as Void {
 (:background)
 function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
+        System.println("Open-Meteo immediate schedule skipped: provider disabled or weather not required");
         weatherProviderDeleteScheduledRefresh();
         return;
     }
 
     if (weatherProviderHasImmediateRefreshScheduled()) {
+        System.println("Open-Meteo immediate schedule skipped: already scheduled");
         return;
     }
 
@@ -334,18 +337,22 @@ function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     if (!lastFailureWasLocationUnavailable
         && lastAttemptAt != null
         && now - (lastAttemptAt as Number) < WEATHER_PROVIDER_FETCH_INTERVAL_S) {
+        System.println("Open-Meteo immediate schedule skipped: fetch interval guard");
         return;
     }
 
     if (lastAttemptAt != null && now - (lastAttemptAt as Number) < WEATHER_PROVIDER_IMMEDIATE_GUARD_S) {
+        System.println("Open-Meteo immediate schedule skipped: immediate guard");
         return;
     }
 
     try {
+        System.println("Open-Meteo immediate schedule requested");
         Background.registerForTemporalEvent(Time.now());
     } catch(e) {
         weatherProviderLogSchedulingFailure("immediate_refresh_now", e);
         try {
+            System.println("Open-Meteo immediate schedule fallback requested");
             Background.registerForTemporalEvent(new Time.Duration(WEATHER_PROVIDER_IMMEDIATE_GUARD_S));
         } catch(e2) {
             weatherProviderLogSchedulingFailure("immediate_refresh_fallback", e2);

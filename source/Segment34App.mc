@@ -12,10 +12,12 @@ class Segment34App extends Application.AppBase {
     
     function initialize() {
         AppBase.initialize();
+        System.println("Segment34Plus app initialize");
     }
 
     // onStart() is called on application start up
     function onStart(state as Dictionary?) as Void {
+        System.println("Segment34Plus app start");
         // Foreground startup continues through getInitialView() -> onSettingsChanged(),
         // which schedules weather refresh after the view and properties are ready.
         // Avoid doing that work here; on fenix847mm firmware 21.39 this early path
@@ -31,6 +33,7 @@ class Segment34App extends Application.AppBase {
     // foreground-only and intentionally wires up UI classes.
     (:typecheck(disableBackgroundCheck))
     function getInitialView() {
+        System.println("Segment34Plus initial view");
         var view = new Segment34View();
         mView = view;
         onSettingsChanged();
@@ -61,12 +64,16 @@ class Segment34App extends Application.AppBase {
 
     (:typecheck(disableBackgroundCheck))
     function onBackgroundData(data) as Void {
+        System.println("Open-Meteo background data received");
+
         var applied = false;
         try {
             applied = weatherProviderApplyBackgroundPayload(data);
         } catch(e) {
             System.println("Open-Meteo background payload apply failure: " + e);
         }
+
+        System.println("Open-Meteo background data applied=" + (applied ? "true" : "false"));
 
         if (!applied) {
             return;
@@ -83,15 +90,18 @@ class Segment34App extends Application.AppBase {
         weatherProviderDeleteLegacyLocationData();
 
         if (!weatherProviderUsesOpenMeteo()) {
+            System.println("Open-Meteo schedule skipped: provider disabled");
             weatherProviderDeleteScheduledRefresh();
             return;
         }
 
         if (!weatherProviderIsWeatherRequired()) {
+            System.println("Open-Meteo schedule skipped: weather not required");
             weatherProviderDeleteScheduledRefresh();
             return;
         }
 
+        System.println("Open-Meteo schedule requested: view=" + ((mView != null) ? "foreground" : "none"));
         if (mView != null) {
             mView.scheduleImmediateCustomWeatherRefreshIfNeeded();
         } else {
