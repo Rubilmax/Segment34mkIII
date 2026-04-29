@@ -345,7 +345,6 @@ function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     }
 
     if (weatherProviderHasImmediateRefreshScheduled()) {
-        System.println("Open-Meteo immediate schedule skipped: already scheduled");
         return;
     }
 
@@ -357,12 +356,10 @@ function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     if (!lastFailureWasLocationUnavailable
         && lastAttemptAt != null
         && now - (lastAttemptAt as Number) < WEATHER_PROVIDER_FETCH_INTERVAL_S) {
-        System.println("Open-Meteo immediate schedule skipped: fetch interval guard");
         return;
     }
 
     if (lastAttemptAt != null && now - (lastAttemptAt as Number) < WEATHER_PROVIDER_IMMEDIATE_GUARD_S) {
-        System.println("Open-Meteo immediate schedule skipped: immediate guard");
         return;
     }
 

@@ -12,6 +12,8 @@ using Toybox.Position;
 (:background)
 class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
 
+    hidden var pendingRequestContext as Dictionary?;
+
     function initialize() {
         ServiceDelegate.initialize();
         System.println("Open-Meteo background service initialize");
@@ -38,15 +40,17 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             return;
         }
 
+        var requestContext = {
+            "fetchedAt" => now,
+            "location" => location,
+            "locationSource" => locationSource,
+            "lastAttemptAt" => now
+        };
+        pendingRequestContext = requestContext;
+
         var options = {
             :method => Communications.HTTP_REQUEST_METHOD_GET,
-            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON,
-            :context => {
-                "fetchedAt" => now,
-                "location" => location,
-                "locationSource" => locationSource,
-                "lastAttemptAt" => now
-            }
+            :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON
         };
 
         try {
@@ -61,8 +65,9 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             logOpenMeteoRequestFailure(
                 WEATHER_PROVIDER_ERROR_REQUEST_FAILED,
                 -1,
-                options.get(:context) as Dictionary
+                requestContext
             );
+            pendingRequestContext = null;
             exitBackgroundPayload(weatherProviderBuildBackgroundFailurePayload(
                 WEATHER_PROVIDER_BACKGROUND_RESULT_REQUEST_FAILED,
                 now,
@@ -72,11 +77,21 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         }
     }
 
-    function onWeatherResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null, context as Object) as Void {
-        var responseContext = context as Dictionary;
+    function onWeatherResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null) as Void {
+        var responseContext = pendingRequestContext;
+        pendingRequestContext = null;
+        if (responseContext == null) {
+            responseContext = {
+                "fetchedAt" => Time.now().value(),
+                "location" => null,
+                "locationSource" => WEATHER_PROVIDER_LOCATION_SOURCE_UNAVAILABLE,
+                "lastAttemptAt" => Time.now().value()
+            };
+        }
         var location = responseContext.get("location") as Array?;
         var locationSource = responseContext.get("locationSource") as String?;
         var lastAttemptAt = weatherProviderToNumber(responseContext.get("lastAttemptAt"));
+        if (lastAttemptAt == null) { lastAttemptAt = Time.now().value(); }
 
         logOpenMeteoHttpResponse(responseCode, data, responseContext);
 
