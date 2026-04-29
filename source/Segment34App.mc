@@ -65,6 +65,11 @@ class Segment34App extends Application.AppBase {
     (:typecheck(disableBackgroundCheck))
     function onBackgroundData(data) as Void {
         System.println("Open-Meteo background data received");
+        if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
+            System.println("Open-Meteo background data ignored: provider disabled or weather not required");
+            weatherProviderDeleteScheduledRefresh();
+            return;
+        }
 
         var applied = false;
         try {
@@ -92,12 +97,14 @@ class Segment34App extends Application.AppBase {
         if (!weatherProviderUsesOpenMeteo()) {
             System.println("Open-Meteo schedule skipped: provider disabled");
             weatherProviderDeleteScheduledRefresh();
+            weatherProviderDeleteSnapshot();
             return;
         }
 
         if (!weatherProviderIsWeatherRequired()) {
             System.println("Open-Meteo schedule skipped: weather not required");
             weatherProviderDeleteScheduledRefresh();
+            weatherProviderDeleteSnapshot();
             return;
         }
 

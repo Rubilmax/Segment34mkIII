@@ -27,9 +27,9 @@ class Segment34View extends WatchUi.WatchFace {
     hidden var centerY as Number;
     hidden var marginX as Number;
     hidden var marginY as Number;
-    hidden var halfMarginY as Number;
-    hidden var halfClockHeight as Number;
-    hidden var halfClockWidth as Number;
+    hidden var halfMarginY as Number = 0;
+    hidden var halfClockHeight as Number = 0;
+    hidden var halfClockWidth as Number = 0;
 
     hidden var fontMoon as WatchUi.FontResource;
     hidden var fontIcons as WatchUi.FontResource;
@@ -230,6 +230,11 @@ class Segment34View extends WatchUi.WatchFace {
         marginY = Math.round(screenHeight / 30);
         marginX = Math.round(screenWidth / 20);
 
+        refreshLoadedResourcesAndLayout();
+        updateWeather();
+    }
+
+    hidden function refreshLoadedResourcesAndLayout() as Void {
         loadResources();
 
         halfClockHeight = Math.round(clockHeight / 2);
@@ -259,8 +264,6 @@ class Segment34View extends WatchUi.WatchFace {
         ];
 
         calculateLayout();
-
-        updateWeather();
     }
 
     hidden function updateActiveLabels() as Void {
@@ -851,10 +854,60 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     function onSettingsChanged() as Void {
-        initialize();
+        var wasOpenMeteo = useOpenMeteoProvider();
+        var wasWeatherRequired = ((runtimeBitmap >> 5) & 0x1) == 1;
+        var previousPropBitmapA = propBitmapA;
+        var previousPropBitmapB = propBitmapB;
+
+        updateProperties();
+
+        var isOpenMeteo = useOpenMeteoProvider();
+        var isWeatherRequired = ((runtimeBitmap >> 5) & 0x1) == 1;
+        var resourceSettingsChanged = ((previousPropBitmapA ^ propBitmapA) & 0x100) != 0
+            || ((previousPropBitmapB ^ propBitmapB) & 0x6000) != 0;
+        var weatherProviderChanged = wasOpenMeteo != isOpenMeteo;
+        var weatherRequirementChanged = wasWeatherRequired != isWeatherRequired;
+
+        if (resourceSettingsChanged) {
+            refreshLoadedResourcesAndLayout();
+        } else if (screenWidth != null) {
+            calculateLayout();
+        }
+
+        cachedComplicationValues = {};
+        refreshCache = {};
         lastUpdate = null;
         lastSlowUpdate = null;
         hrResetState();
+
+        if (weatherProviderChanged || weatherRequirementChanged) {
+            System.println(
+                "Weather settings changed"
+                + ": provider=" + (isOpenMeteo ? "open_meteo" : "garmin")
+                + ", weatherRequired=" + (isWeatherRequired ? "true" : "false")
+            );
+            clearCustomWeatherData();
+            lastCurrentConditionsFetch = null;
+            lastHourlyForecastFetch = null;
+            if (!isOpenMeteo || !isWeatherRequired) {
+                weatherProviderDeleteScheduledRefresh();
+            }
+            if (!isOpenMeteo) {
+                weatherProviderDeleteSnapshot();
+            }
+        }
+
+        if (isWeatherRequired) {
+            if (isOpenMeteo) {
+                applyCustomWeatherSnapshot(loadCustomWeatherSnapshot());
+            } else {
+                updateWeather();
+            }
+        } else {
+            clearCustomWeatherData();
+        }
+        cachedTempUnit = getTempUnit();
+        updateForecastChanges();
         WatchUi.requestUpdate();
     }
 
@@ -1793,7 +1846,6 @@ class Segment34View extends WatchUi.WatchFace {
         var propTheme = propBitmapA & 0x1F;
         themeColors = setColorTheme(propTheme);
         refreshBottomRowState();
-        initializeWeatherData();
 
     }
 
@@ -2152,6 +2204,37 @@ class Segment34View extends WatchUi.WatchFace {
         return forecast;
     }
 
+    hidden function buildForecastWeatherFromSnapshotColumns(columns as Array?, index as Number, utcOffsetSeconds as Number, location as Position.Location or Null) as ForecastWeather? {
+        var count = weatherProviderGetBackgroundHourlyColumnCount(columns);
+        if (count <= 0 || index < 0 || index >= count) { return null; }
+
+        var startTime = weatherProviderGetArrayNumber(columns, 0);
+        var detailCount = weatherProviderGetArrayNumber(columns, 2);
+        if (startTime == null) { return null; }
+        if (detailCount == null) { detailCount = 0; }
+
+        var forecastTime = (startTime as Number) + (index * 3600);
+        var forecast = new ForecastWeather();
+        forecast.observationLocationPosition = location;
+        forecast.forecastTime = forecastTime;
+        forecast.forecastHour = weatherProviderGetForecastHour(forecastTime, utcOffsetSeconds);
+        forecast.condition = weatherProviderGetArrayNumber(weatherProviderGetArrayValue(columns, 3) as Array?, index);
+        forecast.feelsLikeTemperature = weatherProviderGetArrayFloat(weatherProviderGetArrayValue(columns, 4) as Array?, index);
+
+        if (index < (detailCount as Number)) {
+            forecast.temperature = weatherProviderGetArrayNumber(weatherProviderGetArrayValue(columns, 5) as Array?, index);
+            forecast.precipitationChance = weatherProviderGetArrayNumber(weatherProviderGetArrayValue(columns, 6) as Array?, index);
+            forecast.relativeHumidity = weatherProviderGetArrayNumber(weatherProviderGetArrayValue(columns, 7) as Array?, index);
+            forecast.windBearing = weatherProviderGetArrayNumber(weatherProviderGetArrayValue(columns, 8) as Array?, index);
+            forecast.windSpeed = weatherProviderGetArrayFloat(weatherProviderGetArrayValue(columns, 9) as Array?, index);
+
+            var uv = weatherProviderGetArrayFloat(weatherProviderGetArrayValue(columns, 10) as Array?, index);
+            if (uv != null && uv >= 0.0f) { forecast.uvIndex = uv; }
+        }
+
+        return forecast;
+    }
+
     hidden function copyWeatherToSnapshot(snapshot as ForecastWeather, weather) as Void {
         if (weather == null) { return; }
 
@@ -2252,7 +2335,6 @@ class Segment34View extends WatchUi.WatchFace {
         if (fetchedAt != null) { openMeteoSnapshotState[1] = fetchedAt; }
 
         var current = snapshot.get("current") as Dictionary?;
-        var hourly = snapshot.get("hourly") as Array?;
         var sunEvents = snapshot.get("sunEvents") as Array?;
         var location = weatherProviderNormalizeLocation(snapshot.get("location") as Array?);
         var locationText = "unknown";
@@ -2265,7 +2347,7 @@ class Segment34View extends WatchUi.WatchFace {
             + ": available=true"
             + ", fetchedAt=" + ((fetchedAt == null) ? "null" : fetchedAt.format("%d"))
             + ", current=" + ((current == null) ? "false" : "true")
-            + ", hourly=" + ((hourly == null) ? "0" : hourly.size().format("%d"))
+            + ", hourly=" + weatherProviderGetSnapshotHourlyCount(snapshot).format("%d")
             + ", sunEvents=" + ((sunEvents == null) ? "0" : sunEvents.size().format("%d"))
             + ", location=" + locationText
         );
@@ -2298,6 +2380,17 @@ class Segment34View extends WatchUi.WatchFace {
             if (hourly != null) {
                 for (var i = 0; i < hourly.size(); i++) {
                     cachedHourlyForecast.add(buildForecastWeatherFromSnapshotEntry(hourly[i] as Dictionary?, location));
+                }
+            }
+            if (cachedHourlyForecast.size() == 0) {
+                var hourlyColumns = snapshot.get("hourlyColumns") as Array?;
+                var utcOffsetSeconds = weatherProviderToNumber(snapshot.get("utcOffsetSeconds"));
+                var hourlyColumnCount = weatherProviderGetBackgroundHourlyColumnCount(hourlyColumns);
+                if (utcOffsetSeconds != null && hourlyColumnCount > 0) {
+                    for (var j = 0; j < hourlyColumnCount; j++) {
+                        var forecast = buildForecastWeatherFromSnapshotColumns(hourlyColumns, j, utcOffsetSeconds as Number, location);
+                        if (forecast != null) { cachedHourlyForecast.add(forecast); }
+                    }
                 }
             }
             if (fetchedAt != null) { openMeteoSnapshotState[0] = fetchedAt; }

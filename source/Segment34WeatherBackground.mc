@@ -21,6 +21,13 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
 
     function onTemporalEvent() as Void {
         System.println("Open-Meteo background fetch start");
+        if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
+            System.println("Open-Meteo background fetch skipped: provider disabled or weather not required");
+            weatherProviderDeleteScheduledRefresh();
+            exitBackgroundPayload(null);
+            return;
+        }
+
         weatherProviderScheduleNextRefresh();
 
         var now = Time.now().value();

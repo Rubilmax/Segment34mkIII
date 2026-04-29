@@ -913,6 +913,25 @@ function weatherProviderIsBackgroundHourlyColumns(values as Array?) as Boolean {
 }
 
 (:background)
+function weatherProviderGetBackgroundHourlyColumnCount(values as Array?) as Number {
+    if (!weatherProviderIsBackgroundHourlyColumns(values)) { return 0; }
+    var count = weatherProviderGetArrayNumber(values, 1);
+    if (count == null || count < 0) { return 0; }
+    return count as Number;
+}
+
+(:background)
+function weatherProviderGetSnapshotHourlyCount(snapshot as Dictionary?) as Number {
+    if (snapshot == null) { return 0; }
+
+    var hourly = snapshot.get("hourly") as Array?;
+    var hourlyCount = weatherProviderGetArraySize(hourly);
+    if (hourlyCount > 0) { return hourlyCount; }
+
+    return weatherProviderGetBackgroundHourlyColumnCount(snapshot.get("hourlyColumns") as Array?);
+}
+
+(:background)
 function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -927,16 +946,14 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
     var timezone = weatherProviderToString(snapshot.get("z"));
     if (timezone == null) { timezone = "GMT"; }
 
-    var hourly = [];
     var hourlyColumns = snapshot.get("q") as Array?;
-    if (weatherProviderIsBackgroundHourlyColumns(hourlyColumns)) {
-        hourly = weatherProviderDecodeBackgroundHourlyColumns(hourlyColumns, utcOffsetSeconds as Number);
-    }
+    var compactHourlyColumns = weatherProviderIsBackgroundHourlyColumns(hourlyColumns) ? hourlyColumns : null;
+    var hourly = [];
 
     var hourlyEntries = snapshot.get("h") as Array?;
-    if (hourly.size() == 0 && hourlyEntries != null) {
+    if (compactHourlyColumns == null && hourlyEntries != null) {
         if (weatherProviderIsBackgroundHourlyColumns(hourlyEntries)) {
-            hourly = weatherProviderDecodeBackgroundHourlyColumns(hourlyEntries, utcOffsetSeconds as Number);
+            compactHourlyColumns = hourlyEntries;
         } else {
             var hourlyEntryCount = weatherProviderGetArraySize(hourlyEntries);
             for (var i = 0; i < hourlyEntryCount; i++) {
@@ -957,7 +974,8 @@ function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dic
         "utcOffsetSeconds" => utcOffsetSeconds,
         "current" => current,
         "sunEvents" => weatherProviderDecodeBackgroundSunEvents(snapshot.get("d") as Array?),
-        "hourly" => hourly
+        "hourly" => hourly,
+        "hourlyColumns" => compactHourlyColumns
     };
 }
 
@@ -1056,12 +1074,11 @@ function weatherProviderApplyBackgroundPayload(data) as Boolean {
             null,
             locationSource
         ));
-        var hourly = snapshot.get("hourly") as Array?;
         var sunEvents = snapshot.get("sunEvents") as Array?;
         System.println(
             "Open-Meteo background payload stored"
             + ": successAt=" + (successAt as Number).format("%d")
-            + ", hourly=" + weatherProviderGetArraySize(hourly).format("%d")
+            + ", hourly=" + weatherProviderGetSnapshotHourlyCount(snapshot).format("%d")
             + ", sunEvents=" + weatherProviderGetArraySize(sunEvents).format("%d")
             + ", locationSource=" + locationSource
         );
