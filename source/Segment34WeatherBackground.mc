@@ -16,13 +16,10 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
 
     function initialize() {
         ServiceDelegate.initialize();
-        System.println("Open-Meteo background service initialize");
     }
 
     function onTemporalEvent() as Void {
-        System.println("Open-Meteo background fetch start");
         if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
-            System.println("Open-Meteo background fetch skipped: provider disabled or weather not required");
             weatherProviderDeleteScheduledRefresh();
             exitBackgroundPayload(null);
             return;
@@ -34,8 +31,6 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         var resolvedLocation = resolveWeatherLocation();
         var location = resolvedLocation.get("location") as Array?;
         var locationSource = resolvedLocation.get("source") as String?;
-
-        logOpenMeteoBackgroundFetchLocation(location, locationSource);
 
         if (location == null) {
             exitBackgroundPayload(weatherProviderBuildBackgroundFailurePayload(
@@ -61,7 +56,6 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         };
 
         try {
-            System.println("Open-Meteo HTTP request start");
             Communications.makeWebRequest(
                 WEATHER_PROVIDER_OPEN_METEO_URL,
                 weatherProviderBuildOpenMeteoParams(location),
@@ -99,8 +93,6 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         var locationSource = responseContext.get("locationSource") as String?;
         var lastAttemptAt = weatherProviderToNumber(responseContext.get("lastAttemptAt"));
         if (lastAttemptAt == null) { lastAttemptAt = Time.now().value(); }
-
-        logOpenMeteoHttpResponse(responseCode, data, responseContext);
 
         if (responseCode == 200 && data instanceof Dictionary) {
             var snapshot = weatherProviderBuildSnapshotFromOpenMeteoResponse(
@@ -177,60 +169,10 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             hourlyLimit
         );
         if (payload == null) {
-            logOpenMeteoBackgroundExitPath("skipped", hourlyLimit);
             return false;
         }
 
-        logOpenMeteoBackgroundExitPath("attempt", hourlyLimit);
-        if (tryExitBackgroundPayload(payload)) {
-            logOpenMeteoBackgroundExitPath("accepted", hourlyLimit);
-            return true;
-        }
-
-        logOpenMeteoBackgroundExitPath("rejected", hourlyLimit);
-        return false;
-    }
-
-    hidden function logOpenMeteoBackgroundExitPath(action as String, hourlyLimit as Number) as Void {
-        System.println(
-            "Open-Meteo Background.exit "
-            + action
-            + ": hourlyLimit="
-            + hourlyLimit.format("%d")
-        );
-    }
-
-    hidden function logOpenMeteoBackgroundFetchLocation(location as Array?, locationSource as String?) as Void {
-        var locationText = "unknown";
-        var normalized = weatherProviderNormalizeLocation(location);
-        if (normalized != null) {
-            locationText = (normalized[0] as Float).format("%.4f") + "," + (normalized[1] as Float).format("%.4f");
-        }
-
-        System.println(
-            "Open-Meteo background fetch location"
-            + ": source=" + ((locationSource == null) ? "unknown" : locationSource)
-            + ", location=" + locationText
-        );
-    }
-
-    hidden function logOpenMeteoHttpResponse(responseCode as Number, data as Dictionary or String or PersistedContent.Iterator or Null, context as Dictionary) as Void {
-        var dataType = "null";
-        if (data instanceof Dictionary) {
-            dataType = "dictionary";
-        } else if (data instanceof String) {
-            dataType = "string";
-        } else if (data != null) {
-            dataType = "iterator";
-        }
-
-        var locationSource = context.get("locationSource") as String?;
-        System.println(
-            "Open-Meteo HTTP response"
-            + ": code=" + responseCode.format("%d")
-            + ", dataType=" + dataType
-            + ", locationSource=" + ((locationSource == null) ? "unknown" : locationSource)
-        );
+        return tryExitBackgroundPayload(payload);
     }
 
     hidden function tryExitBackgroundPayload(payload as Object or Null) as Boolean {

@@ -215,7 +215,6 @@ function weatherProviderLoadOpenMeteoState() as Dictionary? {
     if (state == null) { return null; }
     var provider = weatherProviderToString(state.get("provider"));
     if (!weatherProviderIsOpenMeteoProviderName(provider)) {
-        System.println("Open-Meteo state ignored: provider=" + ((provider == null) ? "null" : provider));
         return null;
     }
     return state;
@@ -224,6 +223,15 @@ function weatherProviderLoadOpenMeteoState() as Dictionary? {
 (:background)
 function weatherProviderStoreState(state as Dictionary) as Void {
     Application.Storage.setValue(WEATHER_PROVIDER_STATE_KEY, state);
+}
+
+(:background)
+function weatherProviderDeleteState() as Void {
+    try {
+        Application.Storage.deleteValue(WEATHER_PROVIDER_STATE_KEY);
+    } catch(e) {
+        System.println("Open-Meteo state delete failure: " + e);
+    }
 }
 
 (:background)
@@ -245,13 +253,11 @@ function weatherProviderLoadSnapshotRaw() as Dictionary? {
 
     var version = weatherProviderToNumber(snapshot.get("version"));
     if (version != WEATHER_SNAPSHOT_VERSION) {
-        System.println("Open-Meteo snapshot ignored: version=" + ((version == null) ? "null" : version.format("%d")));
         return null;
     }
 
     var provider = weatherProviderToString(snapshot.get("provider"));
     if (!weatherProviderIsOpenMeteoProviderName(provider)) {
-        System.println("Open-Meteo snapshot ignored: provider=" + ((provider == null) ? "null" : provider));
         return null;
     }
 
@@ -329,7 +335,6 @@ function weatherProviderDeleteScheduledRefresh() as Void {
 (:background)
 function weatherProviderScheduleNextRefresh() as Void {
     try {
-        System.println("Open-Meteo schedule next refresh: delay=" + WEATHER_PROVIDER_FETCH_INTERVAL_S.format("%d"));
         Background.registerForTemporalEvent(new Time.Duration(WEATHER_PROVIDER_FETCH_INTERVAL_S));
     } catch(e) {
         weatherProviderLogSchedulingFailure("next_refresh", e);
@@ -339,7 +344,6 @@ function weatherProviderScheduleNextRefresh() as Void {
 (:background)
 function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     if (!weatherProviderUsesOpenMeteo() || !weatherProviderIsWeatherRequired()) {
-        System.println("Open-Meteo immediate schedule skipped: provider disabled or weather not required");
         weatherProviderDeleteScheduledRefresh();
         return;
     }
@@ -364,12 +368,10 @@ function weatherProviderScheduleImmediateRefreshIfNeeded() as Void {
     }
 
     try {
-        System.println("Open-Meteo immediate schedule requested");
         Background.registerForTemporalEvent(Time.now());
     } catch(e) {
         weatherProviderLogSchedulingFailure("immediate_refresh_now", e);
         try {
-            System.println("Open-Meteo immediate schedule fallback requested");
             Background.registerForTemporalEvent(new Time.Duration(WEATHER_PROVIDER_IMMEDIATE_GUARD_S));
         } catch(e2) {
             weatherProviderLogSchedulingFailure("immediate_refresh_fallback", e2);
@@ -921,17 +923,6 @@ function weatherProviderGetBackgroundHourlyColumnCount(values as Array?) as Numb
 }
 
 (:background)
-function weatherProviderGetSnapshotHourlyCount(snapshot as Dictionary?) as Number {
-    if (snapshot == null) { return 0; }
-
-    var hourly = snapshot.get("hourly") as Array?;
-    var hourlyCount = weatherProviderGetArraySize(hourly);
-    if (hourlyCount > 0) { return hourlyCount; }
-
-    return weatherProviderGetBackgroundHourlyColumnCount(snapshot.get("hourlyColumns") as Array?);
-}
-
-(:background)
 function weatherProviderDecodeBackgroundSnapshot(snapshot as Dictionary?) as Dictionary? {
     if (snapshot == null) { return null; }
 
@@ -1074,14 +1065,6 @@ function weatherProviderApplyBackgroundPayload(data) as Boolean {
             null,
             locationSource
         ));
-        var sunEvents = snapshot.get("sunEvents") as Array?;
-        System.println(
-            "Open-Meteo background payload stored"
-            + ": successAt=" + (successAt as Number).format("%d")
-            + ", hourly=" + weatherProviderGetSnapshotHourlyCount(snapshot).format("%d")
-            + ", sunEvents=" + weatherProviderGetArraySize(sunEvents).format("%d")
-            + ", locationSource=" + locationSource
-        );
         return true;
     }
 

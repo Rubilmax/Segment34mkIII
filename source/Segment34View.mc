@@ -72,8 +72,7 @@ class Segment34View extends WatchUi.WatchFace {
     hidden var refreshCache as Dictionary = {};
     hidden var cachedComplicationValues as Dictionary = {};
     hidden var cachedTempUnit as String = "C";
-    // [appliedFetchedAt, loggedFetchedAt, unavailableLogged, skippedFetchedAt]
-    hidden var openMeteoSnapshotState as Array = [null, null, 0, null];
+    hidden var openMeteoAppliedSnapshotFetchedAt as Number? = null;
 
     (:WeatherCache) hidden var lastHfTime as Number? = null;
     (:WeatherCache) hidden var lastCcHash as Number? = null;
@@ -211,8 +210,7 @@ class Segment34View extends WatchUi.WatchFace {
         cachedComplicationValues = {};
         lastCurrentConditionsFetch = null;
         lastHourlyForecastFetch = null;
-        openMeteoSnapshotState[0] = null;
-        openMeteoSnapshotState[3] = null;
+        openMeteoAppliedSnapshotFetchedAt = null;
         runtimeBitmap = 0x1;
         layoutBitmap = 0;
 
@@ -881,19 +879,13 @@ class Segment34View extends WatchUi.WatchFace {
         hrResetState();
 
         if (weatherProviderChanged || weatherRequirementChanged) {
-            System.println(
-                "Weather settings changed"
-                + ": provider=" + (isOpenMeteo ? "open_meteo" : "garmin")
-                + ", weatherRequired=" + (isWeatherRequired ? "true" : "false")
-            );
             clearCustomWeatherData();
             lastCurrentConditionsFetch = null;
             lastHourlyForecastFetch = null;
             if (!isOpenMeteo || !isWeatherRequired) {
                 weatherProviderDeleteScheduledRefresh();
-            }
-            if (!isOpenMeteo) {
                 weatherProviderDeleteSnapshot();
+                weatherProviderDeleteState();
             }
         }
 
@@ -913,11 +905,9 @@ class Segment34View extends WatchUi.WatchFace {
 
     public function onWeatherDataChanged() as Void {
         if (!useOpenMeteoProvider()) {
-            System.println("Open-Meteo foreground data ignored: provider disabled");
             return;
         }
         if (((runtimeBitmap >> 5) & 0x1) != 1) {
-            System.println("Open-Meteo foreground data ignored: weather not required");
             return;
         }
 
@@ -1364,12 +1354,11 @@ class Segment34View extends WatchUi.WatchFace {
         return snapshot;
     }
 
-    hidden function getOpenMeteoSunEvents(time as Time.Moment, cacheKey as String) as Array? {
+    hidden function getOpenMeteoSunEvents(time as Time.Moment) as Array? {
         if (!useOpenMeteoProvider()) { return null; }
 
         var snapshot = getCachedOpenMeteoSnapshotForSunEvents();
         if (snapshot == null) {
-            System.println("Open-Meteo sun events unavailable: no snapshot");
             return null;
         }
 
@@ -1377,7 +1366,6 @@ class Segment34View extends WatchUi.WatchFace {
         var sunEvents = snapshot.get("sunEvents") as Array?;
         var sunEventCount = (sunEvents == null) ? 0 : sunEvents.size();
         if (utcOffsetSeconds == null || sunEventCount == 0) {
-            System.println("Open-Meteo sun events unavailable: count=" + sunEventCount.format("%d"));
             return null;
         }
 
@@ -1395,12 +1383,6 @@ class Segment34View extends WatchUi.WatchFace {
             return [new Time.Moment(sunrise as Number), new Time.Moment(sunset as Number)];
         }
 
-        System.println(
-            "Open-Meteo sun events unavailable"
-            + ": key=" + cacheKey
-            + ", targetDay=" + targetDay.format("%d")
-            + ", count=" + sunEventCount.format("%d")
-        );
         return null;
     }
 
@@ -1415,7 +1397,7 @@ class Segment34View extends WatchUi.WatchFace {
 
         var events = null;
         if (useOpenMeteoProvider()) {
-            events = getOpenMeteoSunEvents(time, cacheKey);
+            events = getOpenMeteoSunEvents(time);
         }
 
         if (events == null) {
@@ -2302,14 +2284,12 @@ class Segment34View extends WatchUi.WatchFace {
         cachedLineForecastWorse = null;
         lineWeatherCondition = null;
         lineWeatherCondition3h = null;
-        openMeteoSnapshotState[0] = null;
+        openMeteoAppliedSnapshotFetchedAt = null;
     }
 
     hidden function loadCustomWeatherSnapshot() as Dictionary? {
         try {
-            var snapshot = weatherProviderLoadSnapshot();
-            logCustomWeatherSnapshotLoad(snapshot);
-            return snapshot;
+            return weatherProviderLoadSnapshot();
         } catch(e) {
             System.println("Open-Meteo snapshot load failure: " + e);
             weatherProviderDeleteSnapshot();
@@ -2317,51 +2297,10 @@ class Segment34View extends WatchUi.WatchFace {
         return null;
     }
 
-    hidden function logCustomWeatherSnapshotLoad(snapshot as Dictionary?) as Void {
-        if (snapshot == null) {
-            if (openMeteoSnapshotState[2] != 1) {
-                System.println("Open-Meteo snapshot load: available=false");
-                openMeteoSnapshotState[2] = 1;
-            }
-            return;
-        }
-        openMeteoSnapshotState[2] = 0;
-
-        var fetchedAt = weatherProviderToNumber(snapshot.get("fetchedAt"));
-        var loggedFetchedAt = weatherProviderToNumber(openMeteoSnapshotState[1]);
-        if (fetchedAt != null && loggedFetchedAt != null && fetchedAt == loggedFetchedAt) {
-            return;
-        }
-        if (fetchedAt != null) { openMeteoSnapshotState[1] = fetchedAt; }
-
-        var current = snapshot.get("current") as Dictionary?;
-        var sunEvents = snapshot.get("sunEvents") as Array?;
-        var location = weatherProviderNormalizeLocation(snapshot.get("location") as Array?);
-        var locationText = "unknown";
-        if (location != null) {
-            locationText = (location[0] as Float).format("%.4f") + "," + (location[1] as Float).format("%.4f");
-        }
-
-        System.println(
-            "Open-Meteo snapshot load"
-            + ": available=true"
-            + ", fetchedAt=" + ((fetchedAt == null) ? "null" : fetchedAt.format("%d"))
-            + ", current=" + ((current == null) ? "false" : "true")
-            + ", hourly=" + weatherProviderGetSnapshotHourlyCount(snapshot).format("%d")
-            + ", sunEvents=" + ((sunEvents == null) ? "0" : sunEvents.size().format("%d"))
-            + ", location=" + locationText
-        );
-    }
-
     hidden function applyCustomWeatherSnapshot(snapshot as Dictionary?) as Void {
         var fetchedAt = (snapshot == null) ? null : weatherProviderToNumber(snapshot.get("fetchedAt"));
-        var appliedFetchedAt = weatherProviderToNumber(openMeteoSnapshotState[0]);
+        var appliedFetchedAt = openMeteoAppliedSnapshotFetchedAt;
         if (fetchedAt != null && appliedFetchedAt != null && fetchedAt == appliedFetchedAt && weatherCondition != null) {
-            var skippedFetchedAt = weatherProviderToNumber(openMeteoSnapshotState[3]);
-            if (skippedFetchedAt == null || skippedFetchedAt != fetchedAt) {
-                System.println("Open-Meteo snapshot apply skipped: unchanged fetchedAt=" + (fetchedAt as Number).format("%d"));
-                openMeteoSnapshotState[3] = fetchedAt;
-            }
             return;
         }
 
@@ -2393,17 +2332,7 @@ class Segment34View extends WatchUi.WatchFace {
                     }
                 }
             }
-            if (fetchedAt != null) { openMeteoSnapshotState[0] = fetchedAt; }
-            openMeteoSnapshotState[3] = null;
-
-            System.println(
-                "Open-Meteo snapshot applied"
-                + ": current=" + ((current == null) ? "false" : "true")
-                + ", condition=" + ((currentWeather.condition == null) ? "null" : (currentWeather.condition as Number).format("%d"))
-                + ", temp=" + ((currentWeather.temperature == null) ? "null" : (currentWeather.temperature as Number).format("%d"))
-                + ", hourly=" + cachedHourlyForecast.size().format("%d")
-                + ", hasLocation=" + ((location == null) ? "false" : "true")
-            );
+            if (fetchedAt != null) { openMeteoAppliedSnapshotFetchedAt = fetchedAt; }
         } catch(e) {
             clearCustomWeatherData();
             System.println("Open-Meteo snapshot apply failure: " + e);
