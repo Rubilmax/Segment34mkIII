@@ -1672,7 +1672,7 @@ class Segment34View extends WatchUi.WatchFace {
     hidden function getComplicationValueCacheKey(complicationType as Number, width as Number, now as Gregorian.Info) as String {
         var key = complicationType.format("%d") + ":" + width.format("%d");
         if (complicationType == 31 || complicationType == 39 || complicationType == 40) {
-            key += ":" + now.year.format("%04d") + now.month.format("%02d") + now.day.format("%02d");
+            key += ":" + formatNumberOrEmpty(now.year, "%04d") + formatNumberOrEmpty(now.month, "%02d") + formatNumberOrEmpty(now.day, "%02d");
         }
         key += getComplicationLocationCacheKey(complicationType);
         return key;
@@ -2106,6 +2106,18 @@ class Segment34View extends WatchUi.WatchFace {
         return value.toNumber();
     }
 
+    hidden function formatNumberOrEmpty(value, format as String) as String {
+        var numberValue = toNumberOrNull(value);
+        if (numberValue == null) { return ""; }
+        return numberValue.format(format);
+    }
+
+    hidden function valueToStringOrNull(value) as String? {
+        if (value == null) { return null; }
+        if (value instanceof String) { return value as String; }
+        return (value as Lang.Object).toString();
+    }
+
     hidden function toFloatOrNull(value) as Float? {
         if (value == null) { return null; }
         return value.toFloat();
@@ -2279,7 +2291,8 @@ class Segment34View extends WatchUi.WatchFace {
         try {
             var location = weatherProviderBuildLocation(snapshot.get("location") as Array?);
             var current = snapshot.get("current") as Dictionary?;
-            weatherCondition = buildForecastWeatherFromSnapshotEntry(current, location);
+            var currentWeather = buildForecastWeatherFromSnapshotEntry(current, location);
+            weatherCondition = currentWeather;
 
             var hourly = snapshot.get("hourly") as Array?;
             if (hourly != null) {
@@ -2293,8 +2306,8 @@ class Segment34View extends WatchUi.WatchFace {
             System.println(
                 "Open-Meteo snapshot applied"
                 + ": current=" + ((current == null) ? "false" : "true")
-                + ", condition=" + ((weatherCondition.condition == null) ? "null" : weatherCondition.condition.format("%d"))
-                + ", temp=" + ((weatherCondition.temperature == null) ? "null" : weatherCondition.temperature.format("%d"))
+                + ", condition=" + ((currentWeather.condition == null) ? "null" : (currentWeather.condition as Number).format("%d"))
+                + ", temp=" + ((currentWeather.temperature == null) ? "null" : (currentWeather.temperature as Number).format("%d"))
                 + ", hourly=" + cachedHourlyForecast.size().format("%d")
                 + ", hasLocation=" + ((location == null) ? "false" : "true")
             );
@@ -3323,13 +3336,13 @@ class Segment34View extends WatchUi.WatchFace {
                 value = dayName(today.day_of_week) + ", " + today.day + " " + monthName(today.month) + " " + today.year;
                 break;
             case 1: // ISO: 2024-03-14
-                value = today.year + "-" + today.month.format("%02d") + "-" + today.day.format("%02d");
+                value = today.year + "-" + formatNumberOrEmpty(today.month, "%02d") + "-" + formatNumberOrEmpty(today.day, "%02d");
                 break;
             case 2: // US: 03/14/2024
-                value = today.month.format("%02d") + "/" + today.day.format("%02d") + "/" + today.year;
+                value = formatNumberOrEmpty(today.month, "%02d") + "/" + formatNumberOrEmpty(today.day, "%02d") + "/" + today.year;
                 break;
             case 3: // EU: 14.03.2024
-                value = today.day.format("%02d") + "." + today.month.format("%02d") + "." + today.year;
+                value = formatNumberOrEmpty(today.day, "%02d") + "." + formatNumberOrEmpty(today.month, "%02d") + "." + today.year;
                 break;
             case 4: // THU, 14 MAR (Week number)
                 value = dayName(today.day_of_week) + ", " + today.day + " " + monthName(today.month) + " (W" + isoWeekNumber(today.year, today.month, today.day) + ")";
@@ -3341,13 +3354,13 @@ class Segment34View extends WatchUi.WatchFace {
                 value = dayName(today.day_of_week) + ", " + today.day + " " + monthName(today.month);
                 break;
             case 7: // WEEKDAY, YYYY-MM-DD
-                value = dayName(today.day_of_week) + ", " + today.year + "-" + today.month.format("%02d") + "-" + today.day.format("%02d");
+                value = dayName(today.day_of_week) + ", " + today.year + "-" + formatNumberOrEmpty(today.month, "%02d") + "-" + formatNumberOrEmpty(today.day, "%02d");
                 break;
             case 8: // WEEKDAY, MM/DD/YYYY
-                value = dayName(today.day_of_week) + ", " + today.month.format("%02d") + "/" + today.day.format("%02d") + "/" + today.year;
+                value = dayName(today.day_of_week) + ", " + formatNumberOrEmpty(today.month, "%02d") + "/" + formatNumberOrEmpty(today.day, "%02d") + "/" + today.year;
                 break;
             case 9: // WEEKDAY, DD.MM.YYYY
-                value = dayName(today.day_of_week) + ", " + today.day.format("%02d") + "." + today.month.format("%02d") + "." + today.year;
+                value = dayName(today.day_of_week) + ", " + formatNumberOrEmpty(today.day, "%02d") + "." + formatNumberOrEmpty(today.month, "%02d") + "." + today.year;
                 break;
         }
 
@@ -4069,7 +4082,8 @@ class Segment34View extends WatchUi.WatchFace {
             var comp = Complications.getComplication(cgmComplicationId);
             if (comp == null || comp.value == null) { return ""; }
 
-            var valueStr = comp.value.toString();
+            var valueStr = valueToStringOrNull(comp.value);
+            if (valueStr == null) { return ""; }
             if (valueStr.equals("---")) { return "---"; }
 
             var spaceIndex = valueStr.find(" ");
@@ -4094,7 +4108,9 @@ class Segment34View extends WatchUi.WatchFace {
             if (cgmAgeComplicationId == null) { return ""; }
             var comp = Complications.getComplication(cgmAgeComplicationId);
             if (comp == null || comp.value == null) { return ""; }
-            var timestamp = comp.value.toString().toLong();
+            var valueStr = valueToStringOrNull(comp.value);
+            if (valueStr == null) { return ""; }
+            var timestamp = valueStr.toLong();
             if (timestamp == null || timestamp < 0) { return "---"; }
             var ageMin = (Time.now().value() - timestamp) / 60;
             if (ageMin < 0) { return "---"; }
