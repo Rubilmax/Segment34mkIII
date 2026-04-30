@@ -35,11 +35,7 @@ const WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT = 32;
 (:background)
 const WEATHER_PROVIDER_DETAILED_HOURLY_FORECAST_LIMIT = 8;
 (:background)
-const WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT = 16;
-(:background)
-const WEATHER_PROVIDER_BACKGROUND_SECONDARY_FALLBACK_HOURLY_LIMIT = 8;
-(:background)
-const WEATHER_PROVIDER_BACKGROUND_EMPTY_HOURLY_LIMIT = 0;
+const WEATHER_PROVIDER_BACKGROUND_MIN_HOURLY_LIMIT = 1;
 // The hourly window can spill into the next local calendar day late in the day.
 (:background)
 const WEATHER_PROVIDER_FORECAST_DAYS = 3;
@@ -71,7 +67,7 @@ const WEATHER_PROVIDER_BACKGROUND_RESULT_REQUEST_FAILED = 3;
 (:background)
 function weatherProviderGetSelection() as Number {
     var provider = Application.Properties.getValue("weatherProvider");
-    if (provider == null) { return WEATHER_PROVIDER_GARMIN; }
+    if (provider == null) { return WEATHER_PROVIDER_OPEN_METEO; }
     return provider as Number;
 }
 

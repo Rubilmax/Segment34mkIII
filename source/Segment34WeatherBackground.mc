@@ -101,43 +101,11 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
                 weatherProviderToNumber(responseContext.get("fetchedAt")) as Number
             );
             if (snapshot != null) {
-                var successAt = Time.now().value();
-                if (tryExitBackgroundSuccessPayload(
+                if (exitBackgroundSuccessPayloadWithHourlyFallbacks(
                     snapshot,
                     lastAttemptAt as Number,
-                    successAt,
-                    locationSource,
-                    WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT
-                )) {
-                    return;
-                }
-
-                if (tryExitBackgroundSuccessPayload(
-                    snapshot,
-                    lastAttemptAt as Number,
-                    successAt,
-                    locationSource,
-                    WEATHER_PROVIDER_BACKGROUND_FALLBACK_HOURLY_LIMIT
-                )) {
-                    return;
-                }
-
-                if (tryExitBackgroundSuccessPayload(
-                    snapshot,
-                    lastAttemptAt as Number,
-                    successAt,
-                    locationSource,
-                    WEATHER_PROVIDER_BACKGROUND_SECONDARY_FALLBACK_HOURLY_LIMIT
-                )) {
-                    return;
-                }
-
-                if (tryExitBackgroundSuccessPayload(
-                    snapshot,
-                    lastAttemptAt as Number,
-                    successAt,
-                    locationSource,
-                    WEATHER_PROVIDER_BACKGROUND_EMPTY_HOURLY_LIMIT
+                    Time.now().value(),
+                    locationSource
                 )) {
                     return;
                 }
@@ -158,6 +126,29 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             responseCode,
             locationSource
         ));
+    }
+
+    hidden function exitBackgroundSuccessPayloadWithHourlyFallbacks(snapshot as Dictionary, lastAttemptAt as Number, successAt as Number, locationSource as String?) as Boolean {
+        var hourlyLimit = WEATHER_PROVIDER_HOURLY_FORECAST_LIMIT;
+        while (hourlyLimit >= WEATHER_PROVIDER_BACKGROUND_MIN_HOURLY_LIMIT) {
+            if (tryExitBackgroundSuccessPayload(
+                snapshot,
+                lastAttemptAt,
+                successAt,
+                locationSource,
+                hourlyLimit
+            )) {
+                return true;
+            }
+            hourlyLimit = hourlyLimit >> 1;
+        }
+        return tryExitBackgroundSuccessPayload(
+            snapshot,
+            lastAttemptAt,
+            successAt,
+            locationSource,
+            0
+        );
     }
 
     hidden function tryExitBackgroundSuccessPayload(snapshot as Dictionary, lastAttemptAt as Number, successAt as Number, locationSource as String?, hourlyLimit as Number) as Boolean {
@@ -192,18 +183,26 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
         } catch(e) {}
     }
 
+    hidden function buildLocationResult(location as Location?, source as String) as Dictionary? {
+        if (location == null) { return null; }
+
+        var degrees = location.toDegrees() as Array?;
+        if (degrees == null || degrees.size() < 2 || degrees[0] == null || degrees[1] == null) {
+            return null;
+        }
+
+        return {
+            "location" => [(degrees[0] as Number).toFloat(), (degrees[1] as Number).toFloat()],
+            "source" => source
+        };
+    }
+
     hidden function resolveWeatherLocation() as Dictionary {
         try {
             var info = Position.getInfo();
             if (info != null && info has :position && info.position != null) {
-                var devicePosition = info.position as Location;
-                var degrees = devicePosition.toDegrees() as Array?;
-                if (degrees != null && degrees.size() >= 2 && degrees[0] != null && degrees[1] != null) {
-                    return {
-                        "location" => [(degrees[0] as Number).toFloat(), (degrees[1] as Number).toFloat()],
-                        "source" => WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE
-                    };
-                }
+                var result = buildLocationResult(info.position as Location, WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE);
+                if (result != null) { return result; }
             }
         } catch(e) {}
 
@@ -211,14 +210,8 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             try {
                 var activityInfo = Activity.getActivityInfo();
                 if (activityInfo != null && activityInfo.currentLocation != null) {
-                    var activityLocation = activityInfo.currentLocation as Location;
-                    var degrees = activityLocation.toDegrees() as Array?;
-                    if (degrees != null && degrees.size() >= 2 && degrees[0] != null && degrees[1] != null) {
-                        return {
-                            "location" => [(degrees[0] as Number).toFloat(), (degrees[1] as Number).toFloat()],
-                            "source" => WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE
-                        };
-                    }
+                    var activityResult = buildLocationResult(activityInfo.currentLocation as Location, WEATHER_PROVIDER_LOCATION_SOURCE_DEVICE);
+                    if (activityResult != null) { return activityResult; }
                 }
             } catch(e) {}
         }
@@ -227,14 +220,8 @@ class Segment34WeatherServiceDelegate extends System.ServiceDelegate {
             try {
                 var currentConditions = Weather.getCurrentConditions();
                 if (currentConditions != null && currentConditions.observationLocationPosition != null) {
-                    var cachedLocation = currentConditions.observationLocationPosition as Location;
-                    var degrees = cachedLocation.toDegrees() as Array?;
-                    if (degrees != null && degrees.size() >= 2 && degrees[0] != null && degrees[1] != null) {
-                        return {
-                            "location" => [(degrees[0] as Number).toFloat(), (degrees[1] as Number).toFloat()],
-                            "source" => WEATHER_PROVIDER_LOCATION_SOURCE_GARMIN_CACHE
-                        };
-                    }
+                    var cachedResult = buildLocationResult(currentConditions.observationLocationPosition as Location, WEATHER_PROVIDER_LOCATION_SOURCE_GARMIN_CACHE);
+                    if (cachedResult != null) { return cachedResult; }
                 }
             } catch(e) {}
         }

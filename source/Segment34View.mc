@@ -1790,7 +1790,7 @@ class Segment34View extends WatchUi.WatchFace {
         propBitmapB |= ((getValueOrDefault("smallFontVariant", 2) as Number) & 0x3) << 13;
         propBitmapB |= (((getValueOrDefault("stressDynamicColor", true) as Boolean) ? 1 : 0) << 15);
         propBitmapB |= ((System.getDeviceSettings().is24Hour ? 1 : 0) << 16);
-        propBitmapB |= ((getValueOrDefault("weatherProvider", WEATHER_PROVIDER_GARMIN) as Number) & 0x1) << 17;
+        propBitmapB |= ((getValueOrDefault("weatherProvider", WEATHER_PROVIDER_OPEN_METEO) as Number) & 0x1) << 17;
         propBitmapB |= ((getValueOrDefault("fieldLayout", 11) as Number) & 0xF) << 23;
 
         propSunriseFieldShows = getValueOrDefault("sunriseFieldShows", 39) as Number;
