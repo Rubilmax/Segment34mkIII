@@ -35,7 +35,7 @@ If you use `Open-Meteo`, the watch face fetches weather in a Garmin background s
 Open-Meteo uses Open-Meteo's generic forecast endpoint with automatic best-model selection for the current location.
 
 ### How do I change the weather provider?
-Open the watch face settings in Garmin Connect IQ and look for `Weather provider`. `Garmin Weather` is the default. `Open-Meteo` keeps the same layouts and weather fields, but switches the data source.
+Open the watch face settings in Garmin Connect IQ and look for `Weather provider`. `Open-Meteo` is the default. `Garmin Weather` keeps the same layouts and weather fields, but switches the data source back to Garmin's Weather API.
 
 ## Commonly requested features
 

@@ -59,7 +59,7 @@ https://github.com/Rubilmax/Segment34Plus/blob/main/FAQ.md
 
 ## Weather Providers
 
-`Garmin Weather` remains the default provider.
+`Open-Meteo` is the default provider. You can switch back to `Garmin Weather` in the watch face settings.
 
 `Open-Meteo` uses Open-Meteo's `/v1/forecast` endpoint with automatic best-model selection for the current location. It keeps the existing weather fields and forecast cycling while letting Open-Meteo choose the most suitable forecast model behind the scenes.
 
