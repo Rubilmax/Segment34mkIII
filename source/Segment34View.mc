@@ -114,19 +114,12 @@ class Segment34View extends WatchUi.WatchFace {
     hidden var propIcon2 as Number = 2;
     hidden var propSunriseFieldShows as Number = 39;
     hidden var propSunsetFieldShows as Number = 40;
-    hidden var propWeatherLine1Shows as Number = 49;
+    hidden var propWeatherLine1Shows as Number = 78;
     hidden var propWeatherLine2Shows as Number = 79;
     hidden var cachedHourlyForecast as Array<ForecastWeather> = [];
     hidden var cachedForecastChange as Array? = null;
-    hidden var cachedForecastWorse as Array? = null;
-    hidden var cachedLineForecastChange as Array? = null;
-    hidden var cachedLineForecastWorse as Array? = null;
-    hidden var lineWeatherCondition as ForecastWeather or Null = null;
-    hidden var lineWeatherCondition3h as ForecastWeather or Null = null;
-    hidden var weatherConditionOverride as ForecastWeather or Null = null;
-    hidden var forecastChangeOverride as Array? = null;
-    hidden var forecastWorseOverride as Array? = null;
-    hidden var propNotificationCountShows as Number = 36;
+    hidden var cachedForecastSecondChange as Array? = null;
+    hidden var propNotificationCountShows as Number = 14;
     hidden var propWeekOffset as Number = 0;
     hidden var touchAlternativeBottomRow as Array<Number> = [4, 12, 2, 32, -2];
 
@@ -180,8 +173,7 @@ class Segment34View extends WatchUi.WatchFace {
         notif,
         stress,
         bodybatt,
-        moon,
-        lowBatt
+        moon
     }
 
     (:Round240) const bottomFieldWidths = [3, 3, 3, 0];
@@ -234,6 +226,7 @@ class Segment34View extends WatchUi.WatchFace {
 
     hidden function refreshLoadedResourcesAndLayout() as Void {
         loadResources();
+        loadAodFallbackResources();
 
         halfClockHeight = Math.round(clockHeight / 2);
         if(((runtimeBitmap >> 10) & 0x1) == 1) {
@@ -357,6 +350,20 @@ class Segment34View extends WatchUi.WatchFace {
             selectedRes = resReadable;
         }
         fontSmallData = Application.loadResource(selectedRes);
+    }
+
+    (:MIP)
+    hidden function loadAodFallbackResources() as Void { }
+
+    (:AMOLED)
+    hidden function loadAodFallbackResources() as Void {
+        if (screenWidth == 260) {
+            fontClockOutline = fontClock;
+            fontAODData = fontBottomData;
+        }
+        if (drawAODPattern == null) {
+            drawAODPattern = Application.loadResource(Rez.Drawables.aod) as BitmapResource;
+        }
     }
 
     (:Round240)
@@ -709,10 +716,10 @@ class Segment34View extends WatchUi.WatchFace {
         var fieldWidths = cachedFieldWidths;
         values[:dataTopLeft] = getDisplayValueByType(propSunriseFieldShows, 5, now, actInfo, sysStats);
         values[:dataTopRight] = getDisplayValueByType(propSunsetFieldShows, 5, now, actInfo, sysStats);
-        var aboveLine1 = getWeatherLineDisplayState(propWeatherLine1Shows, 10, now, actInfo, sysStats, true);
+        var aboveLine1 = getWeatherLineDisplayState(propWeatherLine1Shows, 10, now, actInfo, sysStats);
         values[:dataAboveLine1] = aboveLine1[0];
         values[:dataAboveLine1Color] = aboveLine1[1];
-        var aboveLine2 = getWeatherLineDisplayState(propWeatherLine2Shows, 10, now, actInfo, sysStats, false);
+        var aboveLine2 = getWeatherLineDisplayState(propWeatherLine2Shows, 10, now, actInfo, sysStats);
         values[:dataAboveLine2] = aboveLine2[0];
         values[:dataAboveLine2Color] = aboveLine2[1];
         values[:dataBelow] = getValueByTypeWithUnit(propDateFieldShows, 10, now, actInfo, sysStats);
@@ -795,9 +802,11 @@ class Segment34View extends WatchUi.WatchFace {
                 cachedValues[:dataSeconds] = now.sec.format("%02d");
             }
 
-            if ((shouldRefreshWeatherLine(propWeatherLine1Shows, true)
-                || shouldRefreshWeatherLine(propWeatherLine2Shows, false))
-                && phaseBucket != lastWeatherPhase) {
+            // Only type 79 lines phase-cycle. Recomputing a non-79 line here would be
+            // pointless and would dereference the null activityInfo passed below.
+            var refreshLine1 = shouldRefreshWeatherLine(propWeatherLine1Shows);
+            var refreshLine2 = shouldRefreshWeatherLine(propWeatherLine2Shows);
+            if ((refreshLine1 || refreshLine2) && phaseBucket != lastWeatherPhase) {
                 if (phaseBucket > 1048574) { phaseBucket = 1048574; }
                 runtimeBitmap = (runtimeBitmap & 0x7FF) | ((phaseBucket + 1) << 11);
 
@@ -807,13 +816,17 @@ class Segment34View extends WatchUi.WatchFace {
                     cachedSysStats = sysStats;
                 }
 
-                var aboveLine1 = getWeatherLineDisplayState(propWeatherLine1Shows, 10, now, null, sysStats, true);
-                cachedValues[:dataAboveLine1] = aboveLine1[0];
-                cachedValues[:dataAboveLine1Color] = aboveLine1[1];
+                if (refreshLine1) {
+                    var aboveLine1 = getWeatherLineDisplayState(propWeatherLine1Shows, 10, now, null, sysStats);
+                    cachedValues[:dataAboveLine1] = aboveLine1[0];
+                    cachedValues[:dataAboveLine1Color] = aboveLine1[1];
+                }
 
-                var aboveLine2 = getWeatherLineDisplayState(propWeatherLine2Shows, 10, now, null, sysStats, false);
-                cachedValues[:dataAboveLine2] = aboveLine2[0];
-                cachedValues[:dataAboveLine2Color] = aboveLine2[1];
+                if (refreshLine2) {
+                    var aboveLine2 = getWeatherLineDisplayState(propWeatherLine2Shows, 10, now, null, sysStats);
+                    cachedValues[:dataAboveLine2] = aboveLine2[0];
+                    cachedValues[:dataAboveLine2Color] = aboveLine2[1];
+                }
             }
 
         }
@@ -1249,7 +1262,9 @@ class Segment34View extends WatchUi.WatchFace {
             }
 
             // Draw clock gradient
-            dc.drawBitmap(centerX - halfClockWidth - (now.min % 2), baseY - halfClockHeight, drawAODPattern);
+            if (drawAODPattern != null) {
+                dc.drawBitmap(centerX - halfClockWidth - (now.min % 2), baseY - halfClockHeight, drawAODPattern);
+            }
 
             // Draw Line below clock
             var y1 = baseY + halfClockHeight + marginY;
@@ -1795,7 +1810,7 @@ class Segment34View extends WatchUi.WatchFace {
 
         propSunriseFieldShows = getValueOrDefault("sunriseFieldShows", 39) as Number;
         propSunsetFieldShows = getValueOrDefault("sunsetFieldShows", 40) as Number;
-        propWeatherLine1Shows = getValueOrDefault("weatherLine1Shows", 49) as Number;
+        propWeatherLine1Shows = getValueOrDefault("weatherLine1Shows", 78) as Number;
         propWeatherLine2Shows = getValueOrDefault("weatherLine2Shows", 79) as Number;
         propDateFieldShows = getValueOrDefault("dateFieldShows", -1) as Number;
         propLeftValueShows = getValueOrDefault("leftValueShows", 11) as Number;
@@ -2115,24 +2130,15 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getActiveWeatherCondition() {
-        if (weatherConditionOverride != null) {
-            return weatherConditionOverride;
-        }
         return weatherCondition;
     }
 
     hidden function getActiveForecastChange() as Array? {
-        if (weatherConditionOverride != null) {
-            return forecastChangeOverride;
-        }
         return cachedForecastChange;
     }
 
-    hidden function getActiveForecastWorse() as Array? {
-        if (weatherConditionOverride != null) {
-            return forecastWorseOverride;
-        }
-        return cachedForecastWorse;
+    hidden function getActiveForecastSecondChange() as Array? {
+        return cachedForecastSecondChange;
     }
 
     hidden function toNumberOrNull(value) as Number? {
@@ -2279,11 +2285,7 @@ class Segment34View extends WatchUi.WatchFace {
         weatherCondition = null;
         cachedHourlyForecast = [];
         cachedForecastChange = null;
-        cachedForecastWorse = null;
-        cachedLineForecastChange = null;
-        cachedLineForecastWorse = null;
-        lineWeatherCondition = null;
-        lineWeatherCondition3h = null;
+        cachedForecastSecondChange = null;
         openMeteoAppliedSnapshotFetchedAt = null;
     }
 
@@ -2546,7 +2548,7 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function isWeatherSource(id as Number) as Boolean {
-        if (id == 20 || id == 39 || id == 40 || (id >= 43 && id <= 55) || (id >= 63 && id <= 79)) {
+        if (id == 20 || id == 39 || id == 40 || (id >= 43 && id <= 55) || (id >= 63 && id <= 70) || (id >= 73 && id <= 75) || (id >= 77 && id <= 79)) {
             return true;
         }
         return false;
@@ -2710,56 +2712,22 @@ class Segment34View extends WatchUi.WatchFace {
         return getDisplayValueByType(complicationType, width, now, activityInfo, sysStats) + unit;
     }
 
-    hidden function getValueByTypeWithUnitWithWeather(complicationType as Number, width as Number, now as Gregorian.Info, activityInfo, sysStats as System.Stats, weatherOverride as ForecastWeather or Null, changeOverride as Array?, worseOverride as Array?) as String {
-        var previousWeather = weatherConditionOverride;
-        var previousChange = forecastChangeOverride;
-        var previousWorse = forecastWorseOverride;
-
-        weatherConditionOverride = weatherOverride;
-        forecastChangeOverride = changeOverride;
-        forecastWorseOverride = worseOverride;
-
-        var value = getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats);
-
-        weatherConditionOverride = previousWeather;
-        forecastChangeOverride = previousChange;
-        forecastWorseOverride = previousWorse;
-
-        return value;
+    hidden function shouldRefreshWeatherLine(complicationType as Number) as Boolean {
+        if (complicationType == 79) { return hasWeatherCycleForecastChanges(); }
+        return false;
     }
 
-    hidden function shouldRefreshWeatherLine(complicationType as Number, usePhasedWeather as Boolean) as Boolean {
-        if (complicationType == 79) { return true; }
-        return usePhasedWeather && isWeatherSource(complicationType);
-    }
-
-    hidden function getWeatherLineDisplayState(complicationType as Number, width as Number, now as Gregorian.Info, activityInfo, sysStats as System.Stats, usePhasedWeather as Boolean) as Array {
+    hidden function getWeatherLineDisplayState(complicationType as Number, width as Number, now as Gregorian.Info, activityInfo, sysStats as System.Stats) as Array {
         if (!isWeatherSource(complicationType)) {
             return [getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats), themeColors[dataVal]];
         }
 
         if (complicationType == 79) {
-            var cycleState;
-            if (lineWeatherCondition != null) {
-                cycleState = getWeatherCycleState(lineWeatherCondition, cachedLineForecastChange, cachedLineForecastWorse);
-            } else {
-                cycleState = getWeatherCycleState(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastWorse());
-            }
+            var cycleState = getWeatherCycleState(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastSecondChange());
             return [cycleState[0], getWeatherPhaseColor(cycleState[1] as Number)];
         }
 
-        if (!usePhasedWeather) {
-            if (lineWeatherCondition == null) {
-                return [getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats), themeColors[dataVal]];
-            }
-            return [getValueByTypeWithUnitWithWeather(complicationType, width, now, activityInfo, sysStats, lineWeatherCondition, null, null), themeColors[dataVal]];
-        }
-
-        var weatherPhaseState = getPhasedWeatherLineState();
-        return [
-            getValueByTypeWithUnitWithWeather(complicationType, width, now, activityInfo, sysStats, weatherPhaseState[0], null, null),
-            getWeatherPhaseColor(weatherPhaseState[1] as Number)
-        ];
+        return [getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats), themeColors[dataVal]];
     }
 
     hidden function getUnitByType(complicationType) as String {
@@ -3250,7 +3218,7 @@ class Segment34View extends WatchUi.WatchFace {
         } else if(complicationType == 73) { // Weather condition, Feels like
             val = formatWeatherConditionFeelsLike(getActiveWeatherCondition());
         } else if(complicationType == 79) { // Weather condition, Feels like, Until when
-            val = formatWeatherCycleValue(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastWorse());
+            val = formatWeatherCycleValue(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastSecondChange());
         } else if(complicationType == 74) { // Feels like
             val = getFeelsLike(false);
         } else if(complicationType == 75) { // Hours to next sun event
@@ -3488,9 +3456,10 @@ class Segment34View extends WatchUi.WatchFace {
         }
     }
 
-    hidden function getWeatherPhase() as Number {
+    hidden function getWeatherPhase(phaseCount as Number) as Number {
+        if (phaseCount <= 1) { return 0; }
         var elapsed = Time.now().value() - wakeTimestamp;
-        return ((elapsed / 4).toNumber() % 3);
+        return ((elapsed / 4).toNumber() % phaseCount);
     }
 
     hidden function blendWeatherColorChannel(baseChannel as Number, accentChannel as Number, accentPercent as Number) as Number {
@@ -3498,65 +3467,42 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getWeatherPhaseColor(accentPercent as Number) as Graphics.ColorType {
-        if (accentPercent <= 0) { return 0xFFFFFF; }
+        var baseColor = themeColors[dataVal];
+        if (accentPercent <= 0) { return baseColor; }
 
-        var primaryColor = themeColors[clock];
-        var red = blendWeatherColorChannel(0xFF, (primaryColor >> 16) & 0xFF, accentPercent);
-        var green = blendWeatherColorChannel(0xFF, (primaryColor >> 8) & 0xFF, accentPercent);
-        var blue = blendWeatherColorChannel(0xFF, primaryColor & 0xFF, accentPercent);
+        var accentColor = themeColors[clock];
+        var red = blendWeatherColorChannel((baseColor >> 16) & 0xFF, (accentColor >> 16) & 0xFF, accentPercent);
+        var green = blendWeatherColorChannel((baseColor >> 8) & 0xFF, (accentColor >> 8) & 0xFF, accentPercent);
+        var blue = blendWeatherColorChannel(baseColor & 0xFF, accentColor & 0xFF, accentPercent);
 
         return (red << 16) | (green << 8) | blue;
     }
 
-    hidden function getPhasedWeatherLineState() as Array {
-        var currentWeather = getActiveWeatherCondition();
-        if (currentWeather == null) {
-            currentWeather = lineWeatherCondition;
-            if (currentWeather == null) {
-                currentWeather = lineWeatherCondition3h;
-            }
-        }
-
-        var phase = getWeatherPhase();
-        if (phase == 1 && lineWeatherCondition != null) {
-            return [lineWeatherCondition, 40];
-        }
-        if (phase == 2 && lineWeatherCondition3h != null) {
-            return [lineWeatherCondition3h, 70];
-        }
-        return [currentWeather, 0];
-    }
-
-    hidden function getWeatherCycleState(activeWeather as ForecastWeather or Null, activeChange as Array?, activeWorse as Array?) as Array {
+    hidden function getWeatherCycleState(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?) as Array {
         if (activeWeather == null || activeWeather.condition == null) {
             return ["", 0];
+        }
+
+        var changeWeather = getForecastEventWeather(activeChange);
+        if (changeWeather == null) {
+            return [formatWeatherConditionFeelsLike(activeWeather), 0];
         }
 
         var displayWeather = activeWeather;
         var pointer = getForecastEventPointer(activeChange, 1);
         var accentPercent = 0;
-        var phase = getWeatherPhase();
+        var secondWeather = getForecastEventWeather(activeSecondChange);
+        var phase = getWeatherPhase((secondWeather == null) ? 2 : 3);
 
         if (phase == 1) {
-            var changeWeather = getForecastEventWeather(activeChange);
-            if (changeWeather != null) {
-                displayWeather = changeWeather;
-                pointer = getForecastEventPointer(activeChange, 2);
-                accentPercent = 40;
-            }
+            displayWeather = changeWeather;
+            pointer = getForecastEventPointer(activeChange, 2);
+            accentPercent = 40;
         } else if (phase == 2) {
-            var worseWeather = getForecastEventWeather(activeWorse);
-            if (worseWeather != null) {
-                displayWeather = worseWeather;
-                pointer = getForecastEventPointer(activeWorse, 2);
+            if (secondWeather != null) {
+                displayWeather = secondWeather;
+                pointer = getForecastEventPointer(activeSecondChange, 2);
                 accentPercent = 70;
-            } else {
-                var changeWeather = getForecastEventWeather(activeChange);
-                if (changeWeather != null) {
-                    displayWeather = changeWeather;
-                    pointer = getForecastEventPointer(activeChange, 2);
-                    accentPercent = 70;
-                }
             }
         }
 
@@ -3573,8 +3519,10 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getForecastEventHour(forecast as ForecastWeather or Null) as Number {
-        if (forecast == null || forecast.forecastHour == null) { return -1; }
-        return forecast.forecastHour;
+        if (forecast == null) { return -1; }
+        var forecastHour = forecast.forecastHour;
+        if (forecastHour == null) { return -1; }
+        return forecastHour as Number;
     }
 
     hidden function buildForecastEvent(forecast as ForecastWeather or Null) as Array? {
@@ -3582,138 +3530,67 @@ class Segment34View extends WatchUi.WatchFace {
         return [buildMergedForecastWeather(forecast), getForecastEventHour(forecast), -1];
     }
 
-    hidden function findHourlyForecastIndex(secondsAhead as Number, maxDiffSeconds as Number?) as Number {
-        if (cachedHourlyForecast.size() == 0) { return -1; }
-
-        var now = Time.now().value();
-        var target = now + secondsAhead;
-        var beforeIdx = -1;
-        var afterIdx = -1;
-
-        for (var i = 0; i < cachedHourlyForecast.size(); i++) {
-            var forecastTime = cachedHourlyForecast[i].forecastTime;
-            if (forecastTime == null || forecastTime <= now) { continue; }
-
-            if (forecastTime < target) {
-                beforeIdx = i;
-                continue;
-            }
-
-            afterIdx = i;
-            break;
-        }
-
-        var selectedIdx = -1;
-        if (afterIdx < 0) {
-            selectedIdx = beforeIdx;
-        } else if (beforeIdx < 0) {
-            selectedIdx = afterIdx;
-        } else {
-            var beforeDiff = target - (cachedHourlyForecast[beforeIdx].forecastTime as Number);
-            var afterDiff = (cachedHourlyForecast[afterIdx].forecastTime as Number) - target;
-            selectedIdx = (afterDiff <= beforeDiff) ? afterIdx : beforeIdx;
-        }
-        if (maxDiffSeconds == null || selectedIdx < 0) { return selectedIdx; }
-
-        var selectedDiff = (cachedHourlyForecast[selectedIdx].forecastTime as Number) - target;
-        if (selectedDiff < 0) {
-            selectedDiff = -selectedDiff;
-        }
-        if (selectedDiff > maxDiffSeconds) {
-            return -1;
-        }
-        return selectedIdx;
-    }
-
     hidden function buildForecastTimeline(baseCondition as Number, startIdx as Number) as Array {
-        var change = null;
-        var worse = null;
-        var changeIdx = -1;
-        var worseIdx = -1;
-        var baseTier = getWeatherTier(baseCondition);
-        var changeTier = -1;
-        var worseTier = -1;
+        var timeline = [null, null];
+        var changeCount = 0;
+        var previousTier = getWeatherTier(baseCondition);
+        var finalForecastHour = -1;
+        var now = Time.now().value();
 
         for (var i = startIdx + 1; i < cachedHourlyForecast.size(); i++) {
             var forecast = cachedHourlyForecast[i];
-            if (forecast.condition == null) { continue; }
+            var forecastTime = forecast.forecastTime;
+            if (forecastTime != null && (forecastTime as Number) <= now) { continue; }
+            var forecastHour = getForecastEventHour(forecast);
+            if (forecastHour >= 0) { finalForecastHour = forecastHour; }
+            var condition = forecast.condition;
+            if (condition == null) { continue; }
 
-            var tier = getWeatherTier(forecast.condition);
-            if (tier != baseTier) {
-                change = buildForecastEvent(forecast);
-                changeIdx = i;
-                changeTier = tier;
+            var tier = getWeatherTier(condition as Number);
+            if (tier == previousTier) { continue; }
+
+            if (changeCount == 0) {
+                timeline[0] = buildForecastEvent(forecast);
+                changeCount = 1;
+            } else if (changeCount == 1) {
+                var firstChange = timeline[0] as Array;
+                firstChange[2] = getForecastEventHour(forecast);
+                timeline[1] = buildForecastEvent(forecast);
+                changeCount = 2;
+            } else {
+                var secondChange = timeline[1] as Array;
+                secondChange[2] = getForecastEventHour(forecast);
                 break;
             }
+
+            previousTier = tier;
         }
 
-        if (change == null) {
-            return [null, null];
+        if (changeCount == 1) {
+            var firstChange = timeline[0] as Array;
+            firstChange[2] = finalForecastHour;
+        } else if (changeCount == 2) {
+            var secondChange = timeline[1] as Array;
+            secondChange[2] = finalForecastHour;
         }
 
-        for (var i = changeIdx + 1; i < cachedHourlyForecast.size(); i++) {
-            var forecast = cachedHourlyForecast[i];
-            if (forecast.condition == null) { continue; }
-
-            var tier = getWeatherTier(forecast.condition);
-            if ((change[2] as Number) < 0 && tier != changeTier) {
-                change[2] = getForecastEventHour(forecast);
-            }
-            if (worse == null && tier > changeTier) {
-                worse = buildForecastEvent(forecast);
-                worseIdx = i;
-                worseTier = tier;
-            }
-            if (worse != null && (change[2] as Number) >= 0) {
-                break;
-            }
-        }
-
-        if (worse != null) {
-            for (var i = worseIdx + 1; i < cachedHourlyForecast.size(); i++) {
-                var forecast = cachedHourlyForecast[i];
-                if (forecast.condition == null) { continue; }
-
-                if (getWeatherTier(forecast.condition) != worseTier) {
-                    worse[2] = getForecastEventHour(forecast);
-                    break;
-                }
-            }
-        }
-
-        return [change, worse];
+        return timeline;
     }
 
     hidden function updateForecastChanges() as Void {
         cachedForecastChange = null;
-        cachedForecastWorse = null;
-        cachedLineForecastChange = null;
-        cachedLineForecastWorse = null;
-        lineWeatherCondition = null;
-        lineWeatherCondition3h = null;
+        cachedForecastSecondChange = null;
 
         if (cachedHourlyForecast.size() == 0) { return; }
-
-        var lineForecastIdx = findHourlyForecastIndex(3600, 2700);
-        if (lineForecastIdx >= 0) {
-            lineWeatherCondition = buildMergedForecastWeather(cachedHourlyForecast[lineForecastIdx]);
-            if (cachedHourlyForecast[lineForecastIdx].condition != null) {
-                var lineTimeline = buildForecastTimeline(cachedHourlyForecast[lineForecastIdx].condition as Number, lineForecastIdx);
-                cachedLineForecastChange = lineTimeline[0];
-                cachedLineForecastWorse = lineTimeline[1];
-            }
-        }
-
-        var lineForecast3hIdx = findHourlyForecastIndex(10800, 2700);
-        if (lineForecast3hIdx >= 0) {
-            lineWeatherCondition3h = buildMergedForecastWeather(cachedHourlyForecast[lineForecast3hIdx]);
-        }
-
         if (weatherCondition == null || weatherCondition.condition == null) { return; }
 
         var timeline = buildForecastTimeline(weatherCondition.condition as Number, -1);
         cachedForecastChange = timeline[0];
-        cachedForecastWorse = timeline[1];
+        cachedForecastSecondChange = timeline[1];
+    }
+
+    hidden function hasWeatherCycleForecastChanges() as Boolean {
+        return getForecastEventWeather(getActiveForecastChange()) != null;
     }
 
     hidden function formatForecastPointer(hour as Number?) as String {
@@ -3773,8 +3650,8 @@ class Segment34View extends WatchUi.WatchFace {
         ]);
     }
 
-    hidden function formatWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeWorse as Array?) as String {
-        return getWeatherCycleState(activeWeather, activeChange, activeWorse)[0];
+    hidden function formatWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?) as String {
+        return getWeatherCycleState(activeWeather, activeChange, activeSecondChange)[0];
     }
 
     hidden function getWeatherCondition(includePrecipitation as Boolean) as String {

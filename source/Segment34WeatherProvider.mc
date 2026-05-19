@@ -25,7 +25,7 @@ const WEATHER_PROVIDER_OPEN_METEO_NAME = "open_meteo_best_match";
 (:background)
 const WEATHER_SNAPSHOT_VERSION = 2;
 (:background)
-const WEATHER_PROVIDER_FETCH_INTERVAL_S = 1800;
+const WEATHER_PROVIDER_FETCH_INTERVAL_S = 1200;
 (:background)
 const WEATHER_PROVIDER_STALE_AFTER_S = 28800;
 (:background)
@@ -90,7 +90,7 @@ function weatherProviderGetPropertyOrDefault(key as String, defaultValue) {
 
 (:background)
 function weatherProviderIsWeatherSourceId(id as Number) as Boolean {
-    if (id == 20 || id == 39 || id == 40 || (id >= 43 && id <= 55) || (id >= 63 && id <= 79)) {
+    if (id == 20 || id == 39 || id == 40 || (id >= 43 && id <= 55) || (id >= 63 && id <= 70) || (id >= 73 && id <= 75) || (id >= 77 && id <= 79)) {
         return true;
     }
     return false;
