@@ -2738,13 +2738,14 @@ class Segment34View extends WatchUi.WatchFace {
         }
 
         if (complicationType == 79) {
-            return [getWeatherCycleValue(
+            var cycleState = getWeatherCycleState(
                 getActiveWeatherCondition(),
                 getActiveForecastChange(),
                 getActiveForecastSecondChange(),
                 getActiveForecastThirdChange(),
                 getActiveForecastFourthChange()
-            ), themeColors[dataVal]];
+            );
+            return [cycleState[0], getWeatherPhaseColor(cycleState[1] as Number)];
         }
 
         return [getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats), themeColors[dataVal]];
@@ -3488,6 +3489,29 @@ class Segment34View extends WatchUi.WatchFace {
         return ((elapsed / weatherCycleIntervalS).toNumber() % phaseCount);
     }
 
+    hidden function blendWeatherColorChannel(baseChannel as Number, accentChannel as Number, accentPercent as Number) as Number {
+        return Math.round(((baseChannel * (100 - accentPercent)) + (accentChannel * accentPercent)) / 100.0).toNumber();
+    }
+
+    hidden function getWeatherPhaseColor(accentPercent as Number) as Graphics.ColorType {
+        var baseColor = themeColors[dataVal];
+        if (accentPercent <= 0) { return baseColor; }
+
+        var accentColor = themeColors[clock];
+        var red = blendWeatherColorChannel((baseColor >> 16) & 0xFF, (accentColor >> 16) & 0xFF, accentPercent);
+        var green = blendWeatherColorChannel((baseColor >> 8) & 0xFF, (accentColor >> 8) & 0xFF, accentPercent);
+        var blue = blendWeatherColorChannel(baseColor & 0xFF, accentColor & 0xFF, accentPercent);
+
+        return (red << 16) | (green << 8) | blue;
+    }
+
+    hidden function getWeatherCycleAccentPercent(phase as Number) as Number {
+        if (phase <= 0) { return 40; }
+        if (phase == 1) { return 70; }
+        if (phase == 2) { return 80; }
+        return 90;
+    }
+
     hidden function getWeatherCycleChangeCount(activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Number {
         if (getForecastEventWeather(activeChange) == null) { return 0; }
         if (getForecastEventWeather(activeSecondChange) == null) { return 1; }
@@ -3503,19 +3527,24 @@ class Segment34View extends WatchUi.WatchFace {
         return activeChange;
     }
 
-    hidden function getWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as String {
+    hidden function getWeatherCycleState(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Array {
         var changeCount = getWeatherCycleChangeCount(activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
         if (changeCount == 0) {
-            return formatWeatherConditionFeelsLike(activeWeather);
+            return [formatWeatherConditionFeelsLike(activeWeather), 0];
         }
 
-        var event = getWeatherCycleEventForPhase(getWeatherPhase(changeCount), activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
+        var phase = getWeatherPhase(changeCount);
+        var event = getWeatherCycleEventForPhase(phase, activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
         var displayWeather = getForecastEventWeather(event);
         if (displayWeather == null) {
-            return formatWeatherConditionFeelsLike(activeWeather);
+            return [formatWeatherConditionFeelsLike(activeWeather), 0];
         }
 
-        return formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(getForecastEventPointer(event, 2));
+        return [formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(getForecastEventPointer(event, 2)), getWeatherCycleAccentPercent(phase)];
+    }
+
+    hidden function getWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as String {
+        return getWeatherCycleState(activeWeather, activeChange, activeSecondChange, activeThirdChange, activeFourthChange)[0] as String;
     }
 
     hidden function getWeatherGroup(condition as Number) as Number {
