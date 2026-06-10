@@ -6,6 +6,7 @@
     <string id="UNIT_FT">FT</string>
     <string id="UNIT_STEPS">STEG</string>
     <string id="UNIT_PUSHES">SKJUT</string>
+    <string id="UNIT_DAY">D</string>
     <string id="LABEL_FL">KS</string>
     <string id="LABEL_NA">N/A</string>
     <string id="LABEL_POS_NA">POSITION N/A</string>

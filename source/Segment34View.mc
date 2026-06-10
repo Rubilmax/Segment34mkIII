@@ -119,6 +119,8 @@ class Segment34View extends WatchUi.WatchFace {
     hidden var cachedHourlyForecast as Array<ForecastWeather> = [];
     hidden var cachedForecastChange as Array? = null;
     hidden var cachedForecastSecondChange as Array? = null;
+    hidden var cachedForecastThirdChange as Array? = null;
+    hidden var cachedForecastFourthChange as Array? = null;
     hidden var propNotificationCountShows as Number = 14;
     hidden var propWeekOffset as Number = 0;
     hidden var touchAlternativeBottomRow as Array<Number> = [4, 12, 2, 32, -2];
@@ -127,8 +129,8 @@ class Segment34View extends WatchUi.WatchFace {
     hidden var cachedLabels as Array<String> = ["", "", "", "", "", ""];
 
     // Cached strings: UNIT_KCAL, UNIT_M, UNIT_FT, UNIT_STEPS, UNIT_PUSHES, LABEL_NA,
-    // LABEL_POS_NA, LABEL_FL
-    hidden var cachedTextResources as Array<String> = ["", "", "", "", "", "", "", ""];
+    // LABEL_POS_NA, LABEL_FL, UNIT_DAY
+    hidden var cachedTextResources as Array<String> = ["", "", "", "", "", "", "", "", ""];
 
     const battFull = "|||||||||||||||||||||||||||||||||||";
     const battEmpty = "{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{";
@@ -137,6 +139,8 @@ class Segment34View extends WatchUi.WatchFace {
     const fullUpdateIntervalS = 60;
     const currentConditionsUpdateIntervalS = 300;
     const hourlyForecastUpdateIntervalS = 900;
+    const weatherCycleIntervalS = 3;
+    const weatherCycleMaxChanges = 4;
 
     // Pre-computed background strings to avoid per-frame string concatenation
     hidden var bgStrings as Array<String> = ["", "#", "##", "###", "####", "#####"];
@@ -251,7 +255,8 @@ class Segment34View extends WatchUi.WatchFace {
             Application.loadResource(Rez.Strings.UNIT_PUSHES),
             Application.loadResource(Rez.Strings.LABEL_NA),
             Application.loadResource(Rez.Strings.LABEL_POS_NA),
-            Application.loadResource(Rez.Strings.LABEL_FL)
+            Application.loadResource(Rez.Strings.LABEL_FL),
+            Application.loadResource(Rez.Strings.UNIT_DAY)
         ];
 
         calculateLayout();
@@ -786,7 +791,7 @@ class Segment34View extends WatchUi.WatchFace {
             updateWeather();
         }
 
-        var phaseBucket = ((unix_timestamp - wakeTimestamp) / 4).toNumber();
+        var phaseBucket = ((unix_timestamp - wakeTimestamp) / weatherCycleIntervalS).toNumber();
         if(lastUpdate == null or unix_timestamp - lastUpdate >= fullUpdateIntervalS) {
             lastUpdate = unix_timestamp;
             cachedValues = computeDisplayValues(now);
@@ -2141,6 +2146,14 @@ class Segment34View extends WatchUi.WatchFace {
         return cachedForecastSecondChange;
     }
 
+    hidden function getActiveForecastThirdChange() as Array? {
+        return cachedForecastThirdChange;
+    }
+
+    hidden function getActiveForecastFourthChange() as Array? {
+        return cachedForecastFourthChange;
+    }
+
     hidden function toNumberOrNull(value) as Number? {
         if (value == null) { return null; }
         return value.toNumber();
@@ -2286,6 +2299,8 @@ class Segment34View extends WatchUi.WatchFace {
         cachedHourlyForecast = [];
         cachedForecastChange = null;
         cachedForecastSecondChange = null;
+        cachedForecastThirdChange = null;
+        cachedForecastFourthChange = null;
         openMeteoAppliedSnapshotFetchedAt = null;
     }
 
@@ -2723,8 +2738,13 @@ class Segment34View extends WatchUi.WatchFace {
         }
 
         if (complicationType == 79) {
-            var cycleState = getWeatherCycleState(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastSecondChange());
-            return [cycleState[0], getWeatherPhaseColor(cycleState[1] as Number)];
+            return [getWeatherCycleValue(
+                getActiveWeatherCondition(),
+                getActiveForecastChange(),
+                getActiveForecastSecondChange(),
+                getActiveForecastThirdChange(),
+                getActiveForecastFourthChange()
+            ), themeColors[dataVal]];
         }
 
         return [getValueByTypeWithUnit(complicationType, width, now, activityInfo, sysStats), themeColors[dataVal]];
@@ -2799,7 +2819,7 @@ class Segment34View extends WatchUi.WatchFace {
                     if (complication != null && complication.value instanceof Number) {
                         var recovery_h = (complication.value as Number) / 60.0;
                         if(recovery_h > 60) {
-                            val = Math.round(recovery_h / 24.0).format(numberFormat) + "d";
+                            val = Math.round(recovery_h / 24.0).format(numberFormat) + cachedTextResources[8];
                         } else { val = Math.round(recovery_h).format(numberFormat); }
                     }
                 } catch(e) {}
@@ -2808,7 +2828,7 @@ class Segment34View extends WatchUi.WatchFace {
                     if(activityInfo.timeToRecovery != null) {
                         var recovery_h = activityInfo.timeToRecovery;
                         if(recovery_h > 60) {
-                            val = Math.round(recovery_h / 24.0).format(numberFormat) + "d";
+                            val = Math.round(recovery_h / 24.0).format(numberFormat) + cachedTextResources[8];
                         } else {
                             val = Math.round(recovery_h).format(numberFormat);
                         }
@@ -3218,7 +3238,13 @@ class Segment34View extends WatchUi.WatchFace {
         } else if(complicationType == 73) { // Weather condition, Feels like
             val = formatWeatherConditionFeelsLike(getActiveWeatherCondition());
         } else if(complicationType == 79) { // Weather condition, Feels like, Until when
-            val = formatWeatherCycleValue(getActiveWeatherCondition(), getActiveForecastChange(), getActiveForecastSecondChange());
+            val = formatWeatherCycleValue(
+                getActiveWeatherCondition(),
+                getActiveForecastChange(),
+                getActiveForecastSecondChange(),
+                getActiveForecastThirdChange(),
+                getActiveForecastFourthChange()
+            );
         } else if(complicationType == 74) { // Feels like
             val = getFeelsLike(false);
         } else if(complicationType == 75) { // Hours to next sun event
@@ -3459,62 +3485,43 @@ class Segment34View extends WatchUi.WatchFace {
     hidden function getWeatherPhase(phaseCount as Number) as Number {
         if (phaseCount <= 1) { return 0; }
         var elapsed = Time.now().value() - wakeTimestamp;
-        return ((elapsed / 4).toNumber() % phaseCount);
+        return ((elapsed / weatherCycleIntervalS).toNumber() % phaseCount);
     }
 
-    hidden function blendWeatherColorChannel(baseChannel as Number, accentChannel as Number, accentPercent as Number) as Number {
-        return Math.round(((baseChannel * (100 - accentPercent)) + (accentChannel * accentPercent)) / 100.0).toNumber();
+    hidden function getWeatherCycleChangeCount(activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Number {
+        if (getForecastEventWeather(activeChange) == null) { return 0; }
+        if (getForecastEventWeather(activeSecondChange) == null) { return 1; }
+        if (getForecastEventWeather(activeThirdChange) == null) { return 2; }
+        if (getForecastEventWeather(activeFourthChange) == null) { return 3; }
+        return 4;
     }
 
-    hidden function getWeatherPhaseColor(accentPercent as Number) as Graphics.ColorType {
-        var baseColor = themeColors[dataVal];
-        if (accentPercent <= 0) { return baseColor; }
-
-        var accentColor = themeColors[clock];
-        var red = blendWeatherColorChannel((baseColor >> 16) & 0xFF, (accentColor >> 16) & 0xFF, accentPercent);
-        var green = blendWeatherColorChannel((baseColor >> 8) & 0xFF, (accentColor >> 8) & 0xFF, accentPercent);
-        var blue = blendWeatherColorChannel(baseColor & 0xFF, accentColor & 0xFF, accentPercent);
-
-        return (red << 16) | (green << 8) | blue;
+    hidden function getWeatherCycleEventForPhase(phase as Number, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Array? {
+        if (phase == 1) { return activeSecondChange; }
+        if (phase == 2) { return activeThirdChange; }
+        if (phase == 3) { return activeFourthChange; }
+        return activeChange;
     }
 
-    hidden function getWeatherCycleState(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?) as Array {
-        if (activeWeather == null || activeWeather.condition == null) {
-            return ["", 0];
+    hidden function getWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as String {
+        var changeCount = getWeatherCycleChangeCount(activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
+        if (changeCount == 0) {
+            return formatWeatherConditionFeelsLike(activeWeather);
         }
 
-        var changeWeather = getForecastEventWeather(activeChange);
-        if (changeWeather == null) {
-            return [formatWeatherConditionFeelsLike(activeWeather), 0];
+        var event = getWeatherCycleEventForPhase(getWeatherPhase(changeCount), activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
+        var displayWeather = getForecastEventWeather(event);
+        if (displayWeather == null) {
+            return formatWeatherConditionFeelsLike(activeWeather);
         }
 
-        var displayWeather = activeWeather;
-        var pointer = getForecastEventPointer(activeChange, 1);
-        var accentPercent = 0;
-        var secondWeather = getForecastEventWeather(activeSecondChange);
-        var phase = getWeatherPhase((secondWeather == null) ? 2 : 3);
-
-        if (phase == 1) {
-            displayWeather = changeWeather;
-            pointer = getForecastEventPointer(activeChange, 2);
-            accentPercent = 40;
-        } else if (phase == 2) {
-            if (secondWeather != null) {
-                displayWeather = secondWeather;
-                pointer = getForecastEventPointer(activeSecondChange, 2);
-                accentPercent = 70;
-            }
-        }
-
-        return [formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(pointer), accentPercent];
+        return formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(getForecastEventPointer(event, 2));
     }
 
-    hidden function getWeatherTier(condition as Number) as Number {
-        if (condition == 0 || condition == 1 || condition == 22 || condition == 23 || condition == 40 || condition == 52) { return 0; }
-        if (condition == 2 || condition == 5 || condition == 8 || condition == 9 || condition == 11 || condition == 20 || condition == 27 || condition == 29 || condition == 30 || condition == 33 || condition == 35 || condition == 39 || condition == 43 || condition == 44 || condition == 45 || condition == 46 || condition == 47) { return 1; }
-        if (condition == 3 || condition == 4 || condition == 7 || condition == 13 || condition == 14 || condition == 15 || condition == 16 || condition == 17 || condition == 18 || condition == 19 || condition == 21 || condition == 24 || condition == 25 || condition == 26 || condition == 31 || condition == 48 || condition == 50 || condition == 51) { return 2; }
-        if (condition == 6 || condition == 10 || condition == 12 || condition == 28 || condition == 32 || condition == 34 || condition == 36) { return 3; }
-        if (condition == 37 || condition == 38 || condition == 41 || condition == 42 || condition == 49) { return 4; }
+    hidden function getWeatherGroup(condition as Number) as Number {
+        if (condition == 0 || condition == 1 || condition == 2 || condition == 5 || condition == 20 || condition == 22 || condition == 23 || condition == 40 || condition == 52) { return 0; }
+        if (condition == 3 || condition == 11 || condition == 14 || condition == 15 || condition == 24 || condition == 25 || condition == 26 || condition == 27 || condition == 31 || condition == 45) { return 2; }
+        if (condition == 4 || condition == 7 || condition == 16 || condition == 17 || condition == 18 || condition == 19 || condition == 21 || condition == 34 || condition == 43 || condition == 44 || condition == 46 || condition == 47 || condition == 48 || condition == 49 || condition == 50 || condition == 51) { return 3; }
         return 1;
     }
 
@@ -3531,9 +3538,9 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function buildForecastTimeline(baseCondition as Number, startIdx as Number) as Array {
-        var timeline = [null, null];
+        var timeline = [null, null, null, null];
         var changeCount = 0;
-        var previousTier = getWeatherTier(baseCondition);
+        var previousGroup = getWeatherGroup(baseCondition);
         var finalForecastHour = -1;
         var now = Time.now().value();
 
@@ -3546,32 +3553,28 @@ class Segment34View extends WatchUi.WatchFace {
             var condition = forecast.condition;
             if (condition == null) { continue; }
 
-            var tier = getWeatherTier(condition as Number);
-            if (tier == previousTier) { continue; }
+            var group = getWeatherGroup(condition as Number);
+            if (group == previousGroup) { continue; }
 
-            if (changeCount == 0) {
-                timeline[0] = buildForecastEvent(forecast);
-                changeCount = 1;
-            } else if (changeCount == 1) {
-                var firstChange = timeline[0] as Array;
-                firstChange[2] = getForecastEventHour(forecast);
-                timeline[1] = buildForecastEvent(forecast);
-                changeCount = 2;
+            if (changeCount < weatherCycleMaxChanges) {
+                if (changeCount > 0) {
+                    var previousChange = timeline[changeCount - 1] as Array;
+                    previousChange[2] = forecastHour;
+                }
+                timeline[changeCount] = buildForecastEvent(forecast);
+                changeCount = changeCount + 1;
             } else {
-                var secondChange = timeline[1] as Array;
-                secondChange[2] = getForecastEventHour(forecast);
+                var lastChange = timeline[weatherCycleMaxChanges - 1] as Array;
+                lastChange[2] = forecastHour;
                 break;
             }
 
-            previousTier = tier;
+            previousGroup = group;
         }
 
-        if (changeCount == 1) {
-            var firstChange = timeline[0] as Array;
-            firstChange[2] = finalForecastHour;
-        } else if (changeCount == 2) {
-            var secondChange = timeline[1] as Array;
-            secondChange[2] = finalForecastHour;
+        if (changeCount > 0) {
+            var finalChange = timeline[changeCount - 1] as Array;
+            finalChange[2] = finalForecastHour;
         }
 
         return timeline;
@@ -3580,6 +3583,8 @@ class Segment34View extends WatchUi.WatchFace {
     hidden function updateForecastChanges() as Void {
         cachedForecastChange = null;
         cachedForecastSecondChange = null;
+        cachedForecastThirdChange = null;
+        cachedForecastFourthChange = null;
 
         if (cachedHourlyForecast.size() == 0) { return; }
         if (weatherCondition == null || weatherCondition.condition == null) { return; }
@@ -3587,6 +3592,8 @@ class Segment34View extends WatchUi.WatchFace {
         var timeline = buildForecastTimeline(weatherCondition.condition as Number, -1);
         cachedForecastChange = timeline[0];
         cachedForecastSecondChange = timeline[1];
+        cachedForecastThirdChange = timeline[2];
+        cachedForecastFourthChange = timeline[3];
     }
 
     hidden function hasWeatherCycleForecastChanges() as Boolean {
@@ -3650,8 +3657,8 @@ class Segment34View extends WatchUi.WatchFace {
         ]);
     }
 
-    hidden function formatWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?) as String {
-        return getWeatherCycleState(activeWeather, activeChange, activeSecondChange)[0];
+    hidden function formatWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as String {
+        return getWeatherCycleValue(activeWeather, activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
     }
 
     hidden function getWeatherCondition(includePrecipitation as Boolean) as String {
