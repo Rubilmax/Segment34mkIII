@@ -63,7 +63,7 @@ https://github.com/Rubilmax/Segment34Plus/blob/main/FAQ.md
 
 `Open-Meteo` uses Open-Meteo's `/v1/forecast` endpoint with automatic best-model selection for the current location. It keeps the existing weather fields and forecast cycling while letting Open-Meteo choose the most suitable forecast model behind the scenes.
 
-The Open-Meteo provider uses automatic location only. The watch face resolves the current position from the device when available, then falls back to Garmin Weather's current observation location when that is available. If a refresh fails for any reason, the last saved Open-Meteo forecast remains on screen until a newer refresh succeeds or the normal 8-hour cache window expires.
+The Open-Meteo provider uses automatic location only. The watch face resolves the current position from the device when available, then falls back to Garmin Weather's current observation location when that is available. If a refresh fails for any reason, the last saved Open-Meteo forecast remains on screen until a newer refresh succeeds or the normal 18-hour cache window expires.
 
 Attribution: weather data for the custom provider is delivered by Open-Meteo using its automatic best-model selection across supported forecast models.
 

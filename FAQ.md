@@ -30,7 +30,7 @@ The weather fields, including sunrise and sunset, need weather data to display a
 
 If you use `Garmin Weather`, the data comes from Garmin's Weather API through the Garmin Connect app on your phone. If it does not show up, make sure the watch is connected to the phone over Bluetooth and that Garmin Connect has location access.
 
-If you use `Open-Meteo`, the watch face fetches weather in a Garmin background service. This mode is automatic-location only. It will try the device position first, then Garmin Weather's current observation location. If a refresh fails for any reason, the last saved Open-Meteo forecast stays visible until a newer refresh succeeds or the normal 8-hour cache window expires.
+If you use `Open-Meteo`, the watch face fetches weather in a Garmin background service. This mode is automatic-location only. It will try the device position first, then Garmin Weather's current observation location. If a refresh fails for any reason, the last saved Open-Meteo forecast stays visible until a newer refresh succeeds or the normal 18-hour cache window expires.
 
 Open-Meteo uses Open-Meteo's generic forecast endpoint with automatic best-model selection for the current location.
 
