@@ -3566,10 +3566,12 @@ class Segment34View extends WatchUi.WatchFace {
         return [buildMergedForecastWeather(forecast), getForecastEventHour(forecast), -1];
     }
 
-    hidden function buildForecastTimeline(baseCondition as Number, startIdx as Number) as Array {
+    hidden function buildForecastTimeline(baseCondition as Number, baseFeelsLike as Float?, startIdx as Number) as Array {
         var timeline = [null, null, null, null];
         var changeCount = 0;
         var previousGroup = getWeatherGroup(baseCondition);
+        var lastCycleFeelsLike = baseFeelsLike;
+        var feelsLikeEventRecordedForGroup = false;
         var finalForecastHour = -1;
         var now = Time.now().value();
 
@@ -3583,7 +3585,53 @@ class Segment34View extends WatchUi.WatchFace {
             if (condition == null) { continue; }
 
             var group = getWeatherGroup(condition as Number);
-            if (group == previousGroup) { continue; }
+            if (group == previousGroup) {
+                if (!feelsLikeEventRecordedForGroup) {
+                    var maxFeelsLikeForecast = null;
+                    var maxFeelsLike = null;
+                    for (var j = i; j < cachedHourlyForecast.size(); j++) {
+                        var forecastForMax = cachedHourlyForecast[j];
+                        var maxForecastTime = forecastForMax.forecastTime;
+                        if (maxForecastTime != null && (maxForecastTime as Number) <= now) { continue; }
+
+                        var maxCondition = forecastForMax.condition;
+                        if (maxCondition == null) { continue; }
+                        if (getWeatherGroup(maxCondition as Number) != group) { break; }
+                        if (forecastForMax.feelsLikeTemperature == null) { continue; }
+
+                        var forecastFeelsLike = forecastForMax.feelsLikeTemperature as Float;
+                        if (maxFeelsLike == null || forecastFeelsLike > (maxFeelsLike as Float)) {
+                            maxFeelsLikeForecast = forecastForMax;
+                            maxFeelsLike = forecastFeelsLike;
+                        }
+                    }
+
+                    var feelsLikeDelta = 0.0f;
+                    if (lastCycleFeelsLike != null && maxFeelsLike != null) {
+                        feelsLikeDelta = (maxFeelsLike as Float) - (lastCycleFeelsLike as Float);
+                        if (feelsLikeDelta < 0.0f) { feelsLikeDelta = -feelsLikeDelta; }
+                    }
+
+                    if (feelsLikeDelta > 5.0f) {
+                        if (changeCount < weatherCycleMaxChanges) {
+                            if (changeCount > 0) {
+                                var previousFeelsLikeChange = timeline[changeCount - 1] as Array;
+                                previousFeelsLikeChange[2] = forecastHour;
+                            }
+                            timeline[changeCount] = buildForecastEvent(maxFeelsLikeForecast as ForecastWeather);
+                            changeCount = changeCount + 1;
+                        } else {
+                            var lastFeelsLikeChange = timeline[weatherCycleMaxChanges - 1] as Array;
+                            lastFeelsLikeChange[2] = forecastHour;
+                            break;
+                        }
+
+                        lastCycleFeelsLike = maxFeelsLike;
+                        feelsLikeEventRecordedForGroup = true;
+                    }
+                }
+                continue;
+            }
 
             if (changeCount < weatherCycleMaxChanges) {
                 if (changeCount > 0) {
@@ -3599,6 +3647,8 @@ class Segment34View extends WatchUi.WatchFace {
             }
 
             previousGroup = group;
+            lastCycleFeelsLike = (forecast.feelsLikeTemperature == null) ? null : forecast.feelsLikeTemperature as Float;
+            feelsLikeEventRecordedForGroup = false;
         }
 
         if (changeCount > 0) {
@@ -3618,7 +3668,8 @@ class Segment34View extends WatchUi.WatchFace {
         if (cachedHourlyForecast.size() == 0) { return; }
         if (weatherCondition == null || weatherCondition.condition == null) { return; }
 
-        var timeline = buildForecastTimeline(weatherCondition.condition as Number, -1);
+        var baseFeelsLike = (weatherCondition.feelsLikeTemperature == null) ? null : weatherCondition.feelsLikeTemperature as Float;
+        var timeline = buildForecastTimeline(weatherCondition.condition as Number, baseFeelsLike, -1);
         cachedForecastChange = timeline[0];
         cachedForecastSecondChange = timeline[1];
         cachedForecastThirdChange = timeline[2];
