@@ -25,19 +25,23 @@ function hrIsHeartRateComplication(complicationType as Number) as Boolean {
 
 function hrReadCurrentHeartRateSample() as Number? {
     var sample = null;
-    var activityInfo = Activity.getActivityInfo();
-    if (activityInfo != null) {
-        sample = activityInfo.currentHeartRate;
-    }
+    try {
+        var activityInfo = Activity.getActivityInfo();
+        if (activityInfo != null && activityInfo has :currentHeartRate) {
+            sample = activityInfo.currentHeartRate;
+        }
+    } catch(e) {}
 
     if (sample == null && (ActivityMonitor has :getHeartRateHistory)) {
-        var history = ActivityMonitor.getHeartRateHistory(1, true);
-        if (history != null) {
-            var hist = history.next();
-            if (hist != null && hist.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
-                sample = hist.heartRate;
+        try {
+            var history = ActivityMonitor.getHeartRateHistory(1, true);
+            if (history != null) {
+                var hist = history.next();
+                if (hist != null && hist has :heartRate && hist.heartRate != ActivityMonitor.INVALID_HR_SAMPLE) {
+                    sample = hist.heartRate;
+                }
             }
-        }
+        } catch(e) {}
     }
 
     return sample;
@@ -85,10 +89,12 @@ function hrGetHeartRateZones() as Array? {
 }
 
 function hrGetMaxHeartRate() as Number? {
-    var profile = UserProfile.getProfile();
-    if (profile != null && profile has :maxHeartRate) {
-        return profile.maxHeartRate;
-    }
+    try {
+        var profile = UserProfile.getProfile();
+        if (profile != null && profile has :maxHeartRate) {
+            return profile.maxHeartRate;
+        }
+    } catch(e) {}
     return null;
 }
 
