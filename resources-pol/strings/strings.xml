@@ -12,13 +12,13 @@
     <string id="LABEL_POS_NA">POZYCJA N/D</string>
 
     <string id="WEATHER_0">BEZCHMURNIE</string>
-    <string id="WEATHER_1">CZĘŚCIOWO POCHMURNO</string>
-    <string id="WEATHER_2">PRZEWAŻNIE POCHMURNO</string>
+    <string id="WEATHER_1">CZĘŚC. POCHMURNO</string>
+    <string id="WEATHER_2">GŁÓWNIE POCHMURNO</string>
     <string id="WEATHER_3">DESZCZ</string>
     <string id="WEATHER_4">ŚNIEG</string>
     <string id="WEATHER_5">WIETRZNIE</string>
     <string id="WEATHER_6">BURZE</string>
-    <string id="WEATHER_7">MIESZANKA ZIMOWA</string>
+    <string id="WEATHER_7">OPADY MIESZANE</string>
     <string id="WEATHER_8">MGŁA</string>
     <string id="WEATHER_9">MGIEŁKA</string>
     <string id="WEATHER_10">GRAD</string>
@@ -29,12 +29,12 @@
     <string id="WEATHER_15">ULEWA</string>
     <string id="WEATHER_16">LEKKI ŚNIEG</string>
     <string id="WEATHER_17">OBFITY ŚNIEG</string>
-    <string id="WEATHER_18">LEKKI DESZCZ ZE ŚNIEGIEM</string>
-    <string id="WEATHER_19">OBFITY DESZCZ ZE ŚNIEGIEM</string>
+    <string id="WEATHER_18">LEKKI DESZCZ/ŚNIEG</string>
+    <string id="WEATHER_19">SILNY DESZCZ/ŚNIEG</string>
     <string id="WEATHER_20">POCHMURNO</string>
-    <string id="WEATHER_21">DESZCZ ZE ŚNIEGIEM</string>
-    <string id="WEATHER_22">CZĘŚCIOWO BEZCHMURNIE</string>
-    <string id="WEATHER_23">PRZEWAŻNIE BEZCHMURNIE</string>
+    <string id="WEATHER_21">DESZCZ/ŚNIEG</string>
+    <string id="WEATHER_22">CZĘŚC. BEZCHMURNIE</string>
+    <string id="WEATHER_23">GŁÓWNIE BEZCHMURNIE</string>
     <string id="WEATHER_24">LEKKIE OPADY</string>
     <string id="WEATHER_25">OPADY</string>
     <string id="WEATHER_26">SILNE OPADY</string>
@@ -45,7 +45,7 @@
     <string id="WEATHER_31">MŻAWKA</string>
     <string id="WEATHER_32">TORNADO</string>
     <string id="WEATHER_33">DYM</string>
-    <string id="WEATHER_34">LOD</string>
+    <string id="WEATHER_34">LÓD</string>
     <string id="WEATHER_35">PIASEK</string>
     <string id="WEATHER_36">SZKWAŁ</string>
     <string id="WEATHER_37">BURZA PIASKOWA</string>
@@ -55,14 +55,14 @@
     <string id="WEATHER_41">HURAGAN</string>
     <string id="WEATHER_42">BURZA TROPIKALNA</string>
     <string id="WEATHER_43">MOŻLIWY ŚNIEG</string>
-    <string id="WEATHER_44">DESZCZ/ŚNIEG?</string>
-    <string id="WEATHER_45">POCHMURNO, DESZCZ?</string>
-    <string id="WEATHER_46">POCHMURNO, MOŻLIWY ŚNIEG</string>
-    <string id="WEATHER_47">POCHMURNO, DESZCZ/ŚNIEG?</string>
-    <string id="WEATHER_48">ZAMIECIE</string>
+    <string id="WEATHER_44">MOŻLIWE OPADY MIESZ.</string>
+    <string id="WEATHER_45">POCHM., DESZCZ MOŻL.</string>
+    <string id="WEATHER_46">POCHM., ŚNIEG MOŻL.</string>
+    <string id="WEATHER_47">POCHM., OPADY MIESZ.</string>
+    <string id="WEATHER_48">PRZELOTNY ŚNIEG</string>
     <string id="WEATHER_49">MARZNĄCY DESZCZ</string>
-    <string id="WEATHER_50">DESZCZ ZE ŚNIEGIEM</string>
-    <string id="WEATHER_51">LÓD I ŚNIEG</string>
+    <string id="WEATHER_50">DESZCZ/ŚNIEG</string>
+    <string id="WEATHER_51">LÓD/ŚNIEG</string>
     <string id="WEATHER_52">CIENKIE CHMURY</string>
     <string id="WEATHER_53">NIEZNANE</string>
 

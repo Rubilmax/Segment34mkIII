@@ -8,6 +8,14 @@ import Toybox.Weather;
 import Toybox.Complications;
 using Toybox.Position;
 
+const WEATHER_CYCLE_FEELS_LIKE_THRESHOLD_C = 5.0f;
+const WEATHER_GROUP_UNKNOWN = 4;
+
+function normalizeWeatherCondition(condition as Number, resourceCount as Number) as Number {
+    if (condition < 0 || condition >= resourceCount) { return 53; }
+    return condition;
+}
+
 class Segment34View extends WatchUi.WatchFace {
 
     hidden var screenHeight as Number;
@@ -2288,6 +2296,16 @@ class Segment34View extends WatchUi.WatchFace {
         var snapshot = new ForecastWeather();
         copyWeatherToSnapshot(snapshot, weatherCondition);
         copyWeatherToSnapshot(snapshot, forecast);
+        if (forecast != null) {
+            // A forecast event must not present the current feels-like value as a
+            // future measurement when that field is missing from the forecast.
+            if (forecast.feelsLikeTemperature == null) {
+                snapshot.feelsLikeTemperature = null;
+            }
+            if (snapshot.condition != null) {
+                snapshot.condition = normalizeWeatherCondition(snapshot.condition as Number, cachedWeatherResIds.size());
+            }
+        }
         return snapshot;
     }
 
@@ -3578,6 +3596,8 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getWeatherGroup(condition as Number) as Number {
+        condition = normalizeWeatherCondition(condition, cachedWeatherResIds.size());
+        if (condition == 53) { return WEATHER_GROUP_UNKNOWN; }
         if (condition == 0 || condition == 1 || condition == 2 || condition == 5 || condition == 20 || condition == 22 || condition == 23 || condition == 40 || condition == 52) { return 0; }
         if (condition == 3 || condition == 11 || condition == 14 || condition == 15 || condition == 24 || condition == 25 || condition == 26 || condition == 27 || condition == 31 || condition == 45) { return 2; }
         if (condition == 4 || condition == 7 || condition == 16 || condition == 17 || condition == 18 || condition == 19 || condition == 21 || condition == 34 || condition == 43 || condition == 44 || condition == 46 || condition == 47 || condition == 48 || condition == 49 || condition == 50 || condition == 51) { return 3; }
@@ -3596,14 +3616,79 @@ class Segment34View extends WatchUi.WatchFace {
         return [buildMergedForecastWeather(forecast), getForecastEventHour(forecast), -1];
     }
 
-    hidden function buildForecastTimeline(baseCondition as Number, baseFeelsLike as Float?, startIdx as Number) as Array {
+    hidden function collectFeelsLikeExcursions(candidates as Array, startIdx as Number, endIdx as Number, group as Number, baseline as Float?, now as Number) as Void {
+        if (startIdx > endIdx) { return; }
+
+        var searchStart = startIdx;
+        var activeBaseline = baseline;
+        var prerequisiteCandidateIdx = -1;
+
+        if (activeBaseline == null) {
+            for (var baselineIdx = searchStart; baselineIdx <= endIdx; baselineIdx++) {
+                var baselineForecast = cachedHourlyForecast[baselineIdx];
+                var baselineTime = baselineForecast.forecastTime;
+                if (baselineTime != null && (baselineTime as Number) <= now) { continue; }
+                if (baselineForecast.condition == null) { return; }
+                if (getWeatherGroup(baselineForecast.condition as Number) != group) { return; }
+                if (baselineForecast.feelsLikeTemperature == null) { continue; }
+
+                activeBaseline = baselineForecast.feelsLikeTemperature as Float;
+                searchStart = baselineIdx + 1;
+                break;
+            }
+        }
+
+        while (activeBaseline != null && searchStart <= endIdx) {
+            var excursionForecast = null;
+            var excursionValue = null;
+            var excursionDelta = -1.0f;
+            var excursionIdx = -1;
+
+            for (var i = searchStart; i <= endIdx; i++) {
+                var forecast = cachedHourlyForecast[i];
+                var forecastTime = forecast.forecastTime;
+                if (forecastTime != null && (forecastTime as Number) <= now) { continue; }
+                if (forecast.condition == null) { break; }
+                if (getWeatherGroup(forecast.condition as Number) != group) { break; }
+                if (forecast.feelsLikeTemperature == null) { continue; }
+
+                var forecastFeelsLike = forecast.feelsLikeTemperature as Float;
+                var delta = forecastFeelsLike - (activeBaseline as Float);
+                if (delta < 0.0f) { delta = -delta; }
+                if (delta > excursionDelta) {
+                    excursionForecast = forecast;
+                    excursionValue = forecastFeelsLike;
+                    excursionDelta = delta;
+                    excursionIdx = i;
+                }
+            }
+
+            if (excursionForecast == null || excursionValue == null || excursionDelta < WEATHER_CYCLE_FEELS_LIKE_THRESHOLD_C) {
+                break;
+            }
+
+            var candidateIdx = candidates.size();
+            candidates.add([excursionForecast, excursionIdx, excursionDelta, false, prerequisiteCandidateIdx]);
+            prerequisiteCandidateIdx = candidateIdx;
+            activeBaseline = excursionValue as Float;
+            searchStart = excursionIdx + 1;
+        }
+    }
+
+    hidden function buildForecastTimeline(baseCondition as Number, baseFeelsLike as Float?, startIdx as Number, includeBaseEvent as Boolean) as Array {
         var timeline = [null, null, null, null];
-        var changeCount = 0;
+        var conditionCandidates = [];
+        var feelsLikeCandidates = [];
         var previousGroup = getWeatherGroup(baseCondition);
-        var lastCycleFeelsLike = baseFeelsLike;
-        var feelsLikeEventRecordedForGroup = false;
+        var segmentStartIdx = startIdx + 1;
+        var segmentBaseline = baseFeelsLike;
         var finalForecastHour = -1;
+        var firstOmittedConditionHour = -1;
         var now = Time.now().value();
+
+        if (includeBaseEvent && startIdx >= 0 && startIdx < cachedHourlyForecast.size()) {
+            conditionCandidates.add([cachedHourlyForecast[startIdx], startIdx]);
+        }
 
         for (var i = startIdx + 1; i < cachedHourlyForecast.size(); i++) {
             var forecast = cachedHourlyForecast[i];
@@ -3612,78 +3697,143 @@ class Segment34View extends WatchUi.WatchFace {
             var forecastHour = getForecastEventHour(forecast);
             if (forecastHour >= 0) { finalForecastHour = forecastHour; }
             var condition = forecast.condition;
-            if (condition == null) { continue; }
-
-            var group = getWeatherGroup(condition as Number);
-            if (group == previousGroup) {
-                if (!feelsLikeEventRecordedForGroup) {
-                    var maxFeelsLikeForecast = null;
-                    var maxFeelsLike = null;
-                    for (var j = i; j < cachedHourlyForecast.size(); j++) {
-                        var forecastForMax = cachedHourlyForecast[j];
-                        var maxForecastTime = forecastForMax.forecastTime;
-                        if (maxForecastTime != null && (maxForecastTime as Number) <= now) { continue; }
-
-                        var maxCondition = forecastForMax.condition;
-                        if (maxCondition == null) { continue; }
-                        if (getWeatherGroup(maxCondition as Number) != group) { break; }
-                        if (forecastForMax.feelsLikeTemperature == null) { continue; }
-
-                        var forecastFeelsLike = forecastForMax.feelsLikeTemperature as Float;
-                        if (maxFeelsLike == null || forecastFeelsLike > (maxFeelsLike as Float)) {
-                            maxFeelsLikeForecast = forecastForMax;
-                            maxFeelsLike = forecastFeelsLike;
-                        }
-                    }
-
-                    var feelsLikeDelta = 0.0f;
-                    if (lastCycleFeelsLike != null && maxFeelsLike != null) {
-                        feelsLikeDelta = (maxFeelsLike as Float) - (lastCycleFeelsLike as Float);
-                        if (feelsLikeDelta < 0.0f) { feelsLikeDelta = -feelsLikeDelta; }
-                    }
-
-                    if (feelsLikeDelta > 5.0f) {
-                        if (changeCount < weatherCycleMaxChanges) {
-                            if (changeCount > 0) {
-                                var previousFeelsLikeChange = timeline[changeCount - 1] as Array;
-                                previousFeelsLikeChange[2] = forecastHour;
-                            }
-                            timeline[changeCount] = buildForecastEvent(maxFeelsLikeForecast as ForecastWeather);
-                            changeCount = changeCount + 1;
-                        } else {
-                            var lastFeelsLikeChange = timeline[weatherCycleMaxChanges - 1] as Array;
-                            lastFeelsLikeChange[2] = forecastHour;
-                            break;
-                        }
-
-                        lastCycleFeelsLike = maxFeelsLike;
-                        feelsLikeEventRecordedForGroup = true;
-                    }
+            if (condition == null) {
+                if (previousGroup >= 0 && previousGroup != WEATHER_GROUP_UNKNOWN) {
+                    collectFeelsLikeExcursions(feelsLikeCandidates, segmentStartIdx, i - 1, previousGroup, segmentBaseline, now);
                 }
+                // A missing condition is a hard boundary. The next known row
+                // establishes a new baseline rather than implying a transition.
+                previousGroup = -1;
+                segmentStartIdx = i + 1;
+                segmentBaseline = null;
                 continue;
             }
 
-            if (changeCount < weatherCycleMaxChanges) {
-                if (changeCount > 0) {
-                    var previousChange = timeline[changeCount - 1] as Array;
-                    previousChange[2] = forecastHour;
+            var group = getWeatherGroup(condition as Number);
+            if (previousGroup < 0) {
+                // Do not promote an unknown row encountered inside a missing-data
+                // gap into a displayed state.
+                if (group != WEATHER_GROUP_UNKNOWN) {
+                    previousGroup = group;
+                    segmentStartIdx = i + 1;
+                    segmentBaseline = (forecast.feelsLikeTemperature == null) ? null : forecast.feelsLikeTemperature as Float;
+                } else {
+                    segmentStartIdx = i + 1;
+                    segmentBaseline = null;
                 }
-                timeline[changeCount] = buildForecastEvent(forecast);
-                changeCount = changeCount + 1;
-            } else {
-                var lastChange = timeline[weatherCycleMaxChanges - 1] as Array;
-                lastChange[2] = forecastHour;
-                break;
+                continue;
             }
+            if (group == previousGroup) { continue; }
 
+            if (previousGroup != WEATHER_GROUP_UNKNOWN) {
+                collectFeelsLikeExcursions(feelsLikeCandidates, segmentStartIdx, i - 1, previousGroup, segmentBaseline, now);
+            }
+            if (conditionCandidates.size() == weatherCycleMaxChanges) {
+                firstOmittedConditionHour = forecastHour;
+            }
+            conditionCandidates.add([forecast, i]);
             previousGroup = group;
-            lastCycleFeelsLike = (forecast.feelsLikeTemperature == null) ? null : forecast.feelsLikeTemperature as Float;
-            feelsLikeEventRecordedForGroup = false;
+            segmentStartIdx = i + 1;
+            segmentBaseline = (group == WEATHER_GROUP_UNKNOWN || forecast.feelsLikeTemperature == null)
+                ? null
+                : forecast.feelsLikeTemperature as Float;
         }
 
-        if (changeCount > 0) {
-            var finalChange = timeline[changeCount - 1] as Array;
-            finalChange[2] = finalForecastHour;
+        if (previousGroup >= 0 && previousGroup != WEATHER_GROUP_UNKNOWN) {
+            collectFeelsLikeExcursions(
+                feelsLikeCandidates,
+                segmentStartIdx,
+                cachedHourlyForecast.size() - 1,
+                previousGroup,
+                segmentBaseline,
+                now
+            );
+        }
+
+        // Condition changes always take precedence over temperature-only
+        // excursions when the four display slots are contested.
+        var selectedCandidates = [];
+        var conditionLimit = conditionCandidates.size();
+        if (conditionLimit > weatherCycleMaxChanges) { conditionLimit = weatherCycleMaxChanges; }
+        for (var conditionIdx = 0; conditionIdx < conditionLimit; conditionIdx++) {
+            selectedCandidates.add(conditionCandidates[conditionIdx]);
+        }
+
+        while (selectedCandidates.size() < weatherCycleMaxChanges) {
+            var strongestIdx = -1;
+            var strongestDelta = -1.0f;
+            var availableSlots = weatherCycleMaxChanges - selectedCandidates.size();
+            for (var feelsLikeIdx = 0; feelsLikeIdx < feelsLikeCandidates.size(); feelsLikeIdx++) {
+                var feelsLikeCandidate = feelsLikeCandidates[feelsLikeIdx] as Array;
+                if (feelsLikeCandidate[3] as Boolean) { continue; }
+
+                var requiredSlots = 0;
+                var requiredIdx = feelsLikeIdx;
+                while (requiredIdx >= 0) {
+                    var requiredCandidate = feelsLikeCandidates[requiredIdx] as Array;
+                    if (!(requiredCandidate[3] as Boolean)) { requiredSlots = requiredSlots + 1; }
+                    requiredIdx = requiredCandidate[4] as Number;
+                }
+                if (requiredSlots > availableSlots) { continue; }
+
+                var candidateDelta = feelsLikeCandidate[2] as Float;
+                if (candidateDelta > strongestDelta) {
+                    strongestIdx = feelsLikeIdx;
+                    strongestDelta = candidateDelta;
+                }
+            }
+
+            if (strongestIdx < 0) { break; }
+
+            // Add the winning candidate's unselected prerequisites first so
+            // every retained delta is measured from a state that is displayed.
+            var requiredChain = [];
+            var selectedFeelsLikeIdx = strongestIdx;
+            while (selectedFeelsLikeIdx >= 0) {
+                var selectedFeelsLikeCandidate = feelsLikeCandidates[selectedFeelsLikeIdx] as Array;
+                if (!(selectedFeelsLikeCandidate[3] as Boolean)) {
+                    requiredChain.add(selectedFeelsLikeIdx);
+                }
+                selectedFeelsLikeIdx = selectedFeelsLikeCandidate[4] as Number;
+            }
+
+            for (var chainIdx = requiredChain.size() - 1; chainIdx >= 0; chainIdx--) {
+                var chainCandidateIdx = requiredChain[chainIdx] as Number;
+                var chainCandidate = feelsLikeCandidates[chainCandidateIdx] as Array;
+                chainCandidate[3] = true;
+                selectedCandidates.add([chainCandidate[0], chainCandidate[1]]);
+            }
+        }
+
+        // The display order remains chronological after priority selection.
+        for (var sortEnd = selectedCandidates.size() - 1; sortEnd > 0; sortEnd--) {
+            for (var sortIdx = 0; sortIdx < sortEnd; sortIdx++) {
+                var leftCandidate = selectedCandidates[sortIdx] as Array;
+                var rightCandidate = selectedCandidates[sortIdx + 1] as Array;
+                if ((leftCandidate[1] as Number) > (rightCandidate[1] as Number)) {
+                    selectedCandidates[sortIdx] = rightCandidate;
+                    selectedCandidates[sortIdx + 1] = leftCandidate;
+                }
+            }
+        }
+
+        for (var selectedIdx = 0; selectedIdx < selectedCandidates.size(); selectedIdx++) {
+            var selectedCandidate = selectedCandidates[selectedIdx] as Array;
+            var selectedForecast = selectedCandidate[0] as ForecastWeather;
+            timeline[selectedIdx] = buildForecastEvent(selectedForecast);
+            if (selectedIdx > 0) {
+                var previousChange = timeline[selectedIdx - 1] as Array;
+                previousChange[2] = getForecastEventHour(selectedForecast);
+            }
+        }
+
+        if (selectedCandidates.size() > 0) {
+            var finalChange = timeline[selectedCandidates.size() - 1] as Array;
+            var finalPointerHour = finalForecastHour;
+            if (conditionCandidates.size() > weatherCycleMaxChanges) {
+                finalPointerHour = firstOmittedConditionHour;
+            }
+            finalChange[2] = finalPointerHour;
         }
 
         return timeline;
@@ -3696,10 +3846,29 @@ class Segment34View extends WatchUi.WatchFace {
         cachedForecastFourthChange = null;
 
         if (cachedHourlyForecast.size() == 0) { return; }
-        if (weatherCondition == null || weatherCondition.condition == null) { return; }
 
-        var baseFeelsLike = (weatherCondition.feelsLikeTemperature == null) ? null : weatherCondition.feelsLikeTemperature as Float;
-        var timeline = buildForecastTimeline(weatherCondition.condition as Number, baseFeelsLike, -1);
+        var timeline = null;
+        if (weatherCondition != null && weatherCondition.condition != null) {
+            var baseFeelsLike = (weatherCondition.feelsLikeTemperature == null) ? null : weatherCondition.feelsLikeTemperature as Float;
+            timeline = buildForecastTimeline(weatherCondition.condition as Number, baseFeelsLike, -1, false);
+        } else {
+            // When current conditions cannot establish a baseline, use the first
+            // usable future row and display it as the first forecast event.
+            var now = Time.now().value();
+            for (var i = 0; i < cachedHourlyForecast.size(); i++) {
+                var forecast = cachedHourlyForecast[i];
+                var forecastTime = forecast.forecastTime;
+                if (forecastTime != null && (forecastTime as Number) <= now) { continue; }
+                if (forecast.condition == null) { continue; }
+                if (getWeatherGroup(forecast.condition as Number) == WEATHER_GROUP_UNKNOWN) { continue; }
+
+                var baseFeelsLike = (forecast.feelsLikeTemperature == null) ? null : forecast.feelsLikeTemperature as Float;
+                timeline = buildForecastTimeline(forecast.condition as Number, baseFeelsLike, i, true);
+                break;
+            }
+        }
+
+        if (timeline == null) { return; }
         cachedForecastChange = timeline[0];
         cachedForecastSecondChange = timeline[1];
         cachedForecastThirdChange = timeline[2];
@@ -3742,8 +3911,7 @@ class Segment34View extends WatchUi.WatchFace {
             }
         }
 
-        var idx = activeWeather.condition as Number;
-        if (idx < 0 || idx >= cachedWeatherResIds.size()) { idx = 53; }
+        var idx = normalizeWeatherCondition(activeWeather.condition as Number, cachedWeatherResIds.size());
 
         return Application.loadResource(cachedWeatherResIds[idx]) + perp;
     }

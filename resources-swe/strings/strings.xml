@@ -29,10 +29,10 @@
     <string id="WEATHER_15">KRAFTIGT REGN</string>
     <string id="WEATHER_16">LÄTT SNÖ</string>
     <string id="WEATHER_17">KRAFTIG SNÖ</string>
-    <string id="WEATHER_18">LÄTT SNÖBLANDAT</string>
-    <string id="WEATHER_19">KRAFTIGT SNÖBLANDAT</string>
+    <string id="WEATHER_18">LÄTT REGN/SNÖ</string>
+    <string id="WEATHER_19">KRAFTIGT REGN/SNÖ</string>
     <string id="WEATHER_20">MOLNIGT</string>
-    <string id="WEATHER_21">REGN OCH SNÖ</string>
+    <string id="WEATHER_21">REGN/SNÖ</string>
     <string id="WEATHER_22">DELVIS KLART</string>
     <string id="WEATHER_23">MEST KLART</string>
     <string id="WEATHER_24">LÄTTA SKURAR</string>
@@ -55,14 +55,14 @@
     <string id="WEATHER_41">ORKAN</string>
     <string id="WEATHER_42">TROPISK STORM</string>
     <string id="WEATHER_43">RISK FÖR SNÖ</string>
-    <string id="WEATHER_44">RISK FÖR SNÖBLANDAT</string>
-    <string id="WEATHER_45">MOLNIGT MED REGN</string>
-    <string id="WEATHER_46">MOLNIGT MED SNÖ</string>
-    <string id="WEATHER_47">MOLNIGT MED SNÖBLANDAT</string>
+    <string id="WEATHER_44">RISK FÖR REGN/SNÖ</string>
+    <string id="WEATHER_45">MOLNIGT, REGNRISK</string>
+    <string id="WEATHER_46">MOLNIGT, SNÖRISK</string>
+    <string id="WEATHER_47">MOLN., RISK REGN/SNÖ</string>
     <string id="WEATHER_48">SNÖBYAR</string>
     <string id="WEATHER_49">UNDERKYLT REGN</string>
-    <string id="WEATHER_50">SLASK</string>
-    <string id="WEATHER_51">IS OCH SNÖ</string>
+    <string id="WEATHER_50">SNÖBL. REGN</string>
+    <string id="WEATHER_51">IS/SNÖ</string>
     <string id="WEATHER_52">TUNNA MOLN</string>
     <string id="WEATHER_53">OKÄNT</string>
 
