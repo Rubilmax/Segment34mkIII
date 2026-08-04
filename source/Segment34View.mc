@@ -147,8 +147,8 @@ class Segment34View extends WatchUi.WatchFace {
     const fullUpdateIntervalS = 60;
     const currentConditionsUpdateIntervalS = 300;
     const hourlyForecastUpdateIntervalS = 900;
-    const weatherCycleIntervalS = 3;
-    const weatherCycleMaxChanges = 4;
+    const weatherCycleIntervalS = 4;
+    const weatherCycleMaxChanges = 3;
 
     // Pre-computed background strings to avoid per-frame string concatenation
     hidden var bgStrings as Array<String> = ["", "#", "##", "###", "####", "#####"];
@@ -3554,9 +3554,10 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getWeatherCycleAccentPercent(phase as Number) as Number {
-        if (phase <= 0) { return 40; }
-        if (phase == 1) { return 70; }
-        if (phase == 2) { return 80; }
+        if (phase <= 0) { return 0; }
+        if (phase == 1) { return 40; }
+        if (phase == 2) { return 70; }
+        if (phase == 3) { return 80; }
         return 90;
     }
 
@@ -3569,10 +3570,11 @@ class Segment34View extends WatchUi.WatchFace {
     }
 
     hidden function getWeatherCycleEventForPhase(phase as Number, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Array? {
-        if (phase == 1) { return activeSecondChange; }
-        if (phase == 2) { return activeThirdChange; }
-        if (phase == 3) { return activeFourthChange; }
-        return activeChange;
+        if (phase == 1) { return activeChange; }
+        if (phase == 2) { return activeSecondChange; }
+        if (phase == 3) { return activeThirdChange; }
+        if (phase == 4) { return activeFourthChange; }
+        return null;
     }
 
     hidden function getWeatherCycleState(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as Array {
@@ -3581,14 +3583,26 @@ class Segment34View extends WatchUi.WatchFace {
             return [formatWeatherConditionFeelsLike(activeWeather), 0];
         }
 
-        var phase = getWeatherPhase(changeCount);
-        var event = getWeatherCycleEventForPhase(phase, activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
+        // Current conditions are the first phase when available, followed by
+        // every retained forecast event. The current phase points to the first
+        // event's start. Forecast-only fallback data still starts at event one.
+        var hasCurrentWeather = activeWeather != null && activeWeather.condition != null;
+        var phase = getWeatherPhase(hasCurrentWeather ? changeCount + 1 : changeCount);
+        if (hasCurrentWeather && phase == 0) {
+            return [
+                formatWeatherConditionFeelsLike(activeWeather) + formatForecastPointer(getForecastEventPointer(activeChange, 1)),
+                getWeatherCycleAccentPercent(phase)
+            ];
+        }
+
+        var forecastPhase = hasCurrentWeather ? phase : phase + 1;
+        var event = getWeatherCycleEventForPhase(forecastPhase, activeChange, activeSecondChange, activeThirdChange, activeFourthChange);
         var displayWeather = getForecastEventWeather(event);
         if (displayWeather == null) {
             return [formatWeatherConditionFeelsLike(activeWeather), 0];
         }
 
-        return [formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(getForecastEventPointer(event, 2)), getWeatherCycleAccentPercent(phase)];
+        return [formatWeatherConditionFeelsLike(displayWeather) + formatForecastPointer(getForecastEventPointer(event, 2)), getWeatherCycleAccentPercent(forecastPhase)];
     }
 
     hidden function getWeatherCycleValue(activeWeather as ForecastWeather or Null, activeChange as Array?, activeSecondChange as Array?, activeThirdChange as Array?, activeFourthChange as Array?) as String {
