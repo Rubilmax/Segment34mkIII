@@ -3697,6 +3697,7 @@ class Segment34View extends WatchUi.WatchFace {
         var segmentStartIdx = startIdx + 1;
         var segmentBaseline = baseFeelsLike;
         var finalForecastHour = -1;
+        var finalForecastIdx = -1;
         var firstOmittedConditionHour = -1;
         var now = Time.now().value();
 
@@ -3709,7 +3710,10 @@ class Segment34View extends WatchUi.WatchFace {
             var forecastTime = forecast.forecastTime;
             if (forecastTime != null && (forecastTime as Number) <= now) { continue; }
             var forecastHour = getForecastEventHour(forecast);
-            if (forecastHour >= 0) { finalForecastHour = forecastHour; }
+            if (forecastHour >= 0) {
+                finalForecastHour = forecastHour;
+                finalForecastIdx = i;
+            }
             var condition = forecast.condition;
             if (condition == null) {
                 if (previousGroup >= 0 && previousGroup != WEATHER_GROUP_UNKNOWN) {
@@ -3836,33 +3840,24 @@ class Segment34View extends WatchUi.WatchFace {
             var selectedForecast = selectedCandidate[0] as ForecastWeather;
             timeline[selectedIdx] = buildForecastEvent(selectedForecast);
 
-            // Condition events describe a span, so their pointer is filled from
-            // the next selected event below. Temperature extrema are instants:
-            // point directly at the hour when the extremum is reached.
-            if (selectedCandidate[2] as Boolean) {
-                var selectedExcursion = timeline[selectedIdx] as Array;
-                selectedExcursion[2] = getForecastEventHour(selectedForecast);
-            }
-
+            // Every event describes the state until the next selected event,
+            // including temperature extrema within the same weather group.
             if (selectedIdx > 0) {
-                var previousCandidate = selectedCandidates[selectedIdx - 1] as Array;
-                if (!(previousCandidate[2] as Boolean)) {
-                    var previousChange = timeline[selectedIdx - 1] as Array;
-                    previousChange[2] = getForecastEventHour(selectedForecast);
-                }
+                var previousChange = timeline[selectedIdx - 1] as Array;
+                previousChange[2] = getForecastEventHour(selectedForecast);
             }
         }
 
         if (selectedCandidates.size() > 0) {
             var finalCandidate = selectedCandidates[selectedCandidates.size() - 1] as Array;
-            if (!(finalCandidate[2] as Boolean)) {
-                var finalChange = timeline[selectedCandidates.size() - 1] as Array;
-                var finalPointerHour = finalForecastHour;
-                if (conditionCandidates.size() > weatherCycleMaxChanges) {
-                    finalPointerHour = firstOmittedConditionHour;
-                }
-                finalChange[2] = finalPointerHour;
+            var finalChange = timeline[selectedCandidates.size() - 1] as Array;
+            var finalPointerHour = -1;
+            if (conditionCandidates.size() > weatherCycleMaxChanges) {
+                finalPointerHour = firstOmittedConditionHour;
+            } else if ((finalCandidate[1] as Number) < finalForecastIdx) {
+                finalPointerHour = finalForecastHour;
             }
+            finalChange[2] = finalPointerHour;
         }
 
         return timeline;
